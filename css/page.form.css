@@ -1,0 +1,22 @@
+.extended-search-filter {
+  position: relative;
+  padding: 7px;
+  margin-top: 5px;
+  background-color: #F4F4F4;
+  color: #333333;
+  border-radius: 5px;
+}
+.extended-search-filter-label {
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+.extended-search-filter-value {
+  padding: 5px;
+  background-color: #FFFFFF;
+  border-radius: 5px;
+}
+.extended-search-remove-button {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+}

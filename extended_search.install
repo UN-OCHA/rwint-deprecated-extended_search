@@ -1,0 +1,74 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function extended_search_schema() {
+  $schema['extended_search_entity'] = array(
+    'description' => 'Extended search base table.',
+    'fields' => array(
+      'entity_id' => array(
+        'description' => 'The primary identifier for an extended search page.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'entity_name' => array(
+        'description' => 'The machine-readable name of this extended search page.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'entity_label' => array(
+        'description' => 'The human-readable name of this extended search page.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'entity_description' => array(
+        'description' => 'Description.',
+        'type' => 'text',
+      ),
+      'target_entity_type' => array(
+        'description' => 'Entity type on which the extended search works.',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'target_bundle' => array(
+        'description' => 'Bundle on which the extended search works.',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'target_fields' => array(
+        'description' => 'Serialized fields settings.',
+        'type' => 'text',
+        'serialize' => TRUE,
+      ),
+      // @see: entity_exportable_schema_fields().
+      'entity_status' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0x01, // ENTITY_CUSTOM
+        'size' => 'tiny',
+        'description' => 'The exportable status of the entity.',
+      ),
+      'entity_module' => array(
+        'description' => 'The name of the providing module if the entity has been defined in code.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('entity_id'),
+    'unique keys' => array(
+      'entity_name' => array('entity_name'),
+    ),
+  );
+  
+  return $schema;
+}

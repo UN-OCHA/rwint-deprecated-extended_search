@@ -1,0 +1,1252 @@
+<?php
+
+require_once "extended_search.inc";
+require_once "extended_search.admin.inc";
+require_once "extended_search.controller.inc";
+
+/**
+ * Implements hook_permission().
+ */
+function extended_search_permission() {
+  $permissions = array(
+    'administer extended_search' => array(
+      'title' => t('Administer extended search'),
+      'description' => t('Administer extended search pages.'),
+    ),
+    'access extended_search' => array(
+      'title' => t('Access extended search'),
+      'description' => t('Access extended search pages.'),
+    ),  
+  );
+  
+  return $permissions;
+}
+
+/**
+ * Implements hook_menu();
+ */
+function extended_search_menu() {
+  $items = array();
+  
+  // We're using %menu_trail so that autocomplete works with
+  // string containing slashes.
+  $items['extended_search/autocomplete/%/%/%/%/%menu_tail'] = array(
+    'page callback' => 'extended_search_autocomplete_callback',
+    'page arguments' => array(2, 3, 4, 5, 6),
+    'access arguments' => array('access extended_search'),
+    'load arguments' => array('%map', '%index'),
+    'type' => MENU_CALLBACK,    
+  );
+  
+  // Actually never called but need to be there otherwise
+  // #autocomplete_path is considered invalid.
+  $items['extended_search/autocomplete/%/%/%/%'] = array(
+    'page callback' => 'extended_search_autocomplete_callback',
+    'page arguments' => array(2, 3, 4, 5),
+    'access arguments' => array('access extended_search'),
+    'type' => MENU_CALLBACK,    
+  );
+
+  $items['extended_search/%extended_search'] = array(
+    'title callback' => 'extended_search_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'extended_search_page_view',
+    'page arguments' => array(1),
+    'access arguments' => array('access extended_search'),
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function extended_search_theme() {
+  $theme = array(
+    'extended_search' => array(
+      'render element' => 'elements',
+      'template' => 'extended_search',
+    ),
+    'extended_search_form_fields' => array(
+      'render element' => 'element',
+    ),
+  );
+  return $theme;
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+function extended_search_entity_info() {
+  $info['extended_search'] = array(
+    'label' => t('Extended search page'),
+    'entity class' => 'ExtendedSearchEntity',
+    'controller class' => 'ExtendedSearchController',
+    'base table' => 'extended_search_entity',
+    'label callback' => 'entity_class_label',
+    'uri callback' => 'entity_class_uri',
+    'fieldable' => FALSE,
+    'exportable' => TRUE,
+    'configuration' => TRUE,
+    'entity keys' => array(
+      'id' => 'entity_id',
+      'name' => 'entity_name',
+      'status' => 'entity_status',
+      'module' => 'entity_module',
+    ),
+    'bundles' => array(),
+    'module' => 'extended_search',
+    'access callback' => 'extended_search_access',
+    'admin ui' => array(
+      'path' => 'admin/structure/extended_search',
+      'controller class' => 'ExtendedSearchUIController',
+      'file' => 'extended_search.admin.inc',
+    ),
+  );
+
+  return $info;
+}
+
+/**
+ * Entity access callback.
+ */
+function extended_search_access($op, $type = NULL, $account = NULL) {
+  if ($op === 'view') {
+    return user_access('access extended_search', $account);
+  }
+  else {
+    return user_access('administer extended_search', $account);
+  }
+}
+
+/**
+ * Entity load function.
+ */
+function extended_search_load($id = NULL, $reset = FALSE) {
+  $ids = (isset($id) ? array($id) : array());
+  $extended_search = extended_search_load_multiple($ids, $reset);
+  return $extended_search ? reset($extended_search) : FALSE;
+}
+
+/**
+ * Load multiple entities.
+ */
+function extended_search_load_multiple($ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('extended_search', $ids, $conditions, $reset);
+}
+
+/**
+ * Get allowed entity types.
+ */
+function extended_search_get_entity_types() {
+  $allowed_entity_types = array();
+  drupal_alter('extended_search_allowed_entity_types', $allowed_entity_types);
+  asort($allowed_entity_types);
+  reset($allowed_entity_types);
+  return $allowed_entity_types;
+}
+
+/**
+ * Get bundles for a particular entity type.
+ */
+function extended_search_get_bundles($entity_type) {
+  $bundles = array();
+  if (!empty($entity_type)) {
+    $info = field_info_bundles($entity_type);
+    foreach ($info as $name => $bundle) {
+      $bundles[$name] = isset($bundle['label']) ? $bundle['label'] : $name;
+    }
+  }
+  asort($bundles);
+  reset($bundles);
+  return $bundles;
+}
+
+/**
+ * Get fields for a particular bundle.
+ */
+function extended_search_get_fields($entity_type, $bundle) {
+  $fields = array();
+  
+  if (!empty($entity_type) && !empty($bundle)) {
+    // Entity schema info
+    $entity_info = entity_get_info($entity_type);
+    $schema_info = drupal_get_schema($entity_info['base table']);
+    
+    // Fields info
+    $fields_info = field_info_fields();
+    
+    // Entity properties
+    $property_info = entity_get_property_info($entity_type);
+    
+    // Field handlers
+    $handlers = array();
+    foreach (extended_search_get_field_handler_info() as $id => $handler) {
+      $types = array_merge($handler['schema types'], $handler['field types']);
+      foreach ($types as $type) {
+        $handlers[$type][$id] = $handler['label'];
+      }
+    }
+    
+    // Combine entity and bundle properties
+    $properties = $property_info['properties'];
+    if (isset($property_info['bundles'][$bundle]['properties'])) {
+      $properties += $property_info['bundles'][$bundle]['properties'];
+    }
+    
+    // Iterate through properties and if handler exists for property type then add to the list of fields.
+    foreach ($properties as $name => $info) {
+      if (isset($info['schema field'], $schema_info['fields'][$info['schema field']]['type'])) {
+        $name = $info['schema field'];
+        $type = $schema_info['fields'][$name]['type'];
+      }
+      elseif (!empty($info['field']) && isset($fields_info[$name]['type'])) {
+        $type = $fields_info[$name]['type'];
+        $field = TRUE;
+      }
+      else {
+        continue;
+      }
+      if (isset($handlers[$type])) {
+        $fields[$name] = array(
+          'label' => $info['label'],
+          'handlers' => $handlers[$type],
+        );        
+      }
+    }
+  }
+  
+  ksort($fields);
+  
+  return $fields;
+}
+
+/**
+ * Return info on available field handlers.
+ */
+function extended_search_get_field_handler_info($handler_id = NULL) {
+  // We use drupal_static pattern as it can be called quite often.
+  static $drupal_static_fast;
+  if (!isset($drupal_static_fast)) {
+    $drupal_static_fast['static_extended_search_field_handler_info'] = &drupal_static(__FUNCTION__);
+  }
+  
+  $field_handler_info = &$drupal_static_fast['static_extended_search_field_handler_info'];
+  
+  if (empty($field_handler_info)) {
+    $info = module_invoke_all('extended_search_field_handler_info');
+    
+    ksort($info);
+    
+    foreach ($info as $id => $handler) {
+      // Check validity
+      if (empty($handler['schema types']) && empty($handler['field types'])) {
+        watchdog('extended_search', 'Invalid field handler: no type.', array(), WATCHDOG_ERROR);
+      }
+      elseif (empty($handler['module'])) {
+        watchdog('extended_search', 'Invalid field handler: invalid module name.', array(), WATCHDOG_ERROR);
+      }
+      elseif (empty($handler['class'])) {
+        watchdog('extended_search', 'Invalid field handler: invalid class name.', array(), WATCHDOG_ERROR);
+      }
+      elseif (empty($handler['file'])) {
+        watchdog('extended_search', 'Invalid field handler: invalid file name.', array(), WATCHDOG_ERROR);
+      }
+      else {
+        $path = DRUPAL_ROOT . '/' . drupal_get_path('module', $handler['module']) . '/' . $handler['file'];
+        
+        if (!module_exists($handler['module'])) {
+          watchdog('extended_search', 'Invalid field handler: invalid module [!module].', array('!module' => $handler['module']), WATCHDOG_ERROR);
+        }
+        elseif (!file_exists($path)) {
+          watchdog('extended_search', 'Invalid field handler: invalid class file [!file].', array('!file' => $handler['file']), WATCHDOG_ERROR);
+        }
+        else {
+          // Correct missing information
+          if (!isset($handler['label'])) {
+            $handler['label'] = t(drupal_ucfirst($id));
+          }
+          if (!isset($handler['description'])) {
+            $handler['description'] = $handler['label'];
+          }
+          if (!isset($handler['schema types'])) {
+            $handler['schema types'] = array();
+          }
+          if (!isset($handler['field types'])) {
+            $handler['field types'] = array();
+          }
+        
+          $handler['id'] = $id;
+        
+          $field_handler_info[$id] = $handler;
+        }
+      }
+    }
+  }
+
+  if (empty($handler_id)) {
+    return $field_handler_info;
+  }
+  elseif (isset($field_handler_info[$handler_id])) {
+    return $field_handler_info[$handler_id];
+  }
+  
+  return NULL;
+}
+
+/**
+ * Get a ExtendedSearchFieldHander object (or all of the available ones)
+ */
+function extended_search_get_field_handler($entity_type, $bundle, $handler_id = NULL) {
+  if (empty($entity_type) || empty($bundle)) {
+    return NULL;
+  }
+  
+  // We use drupal_static pattern as it can be called quite often.
+  static $drupal_static_fast;
+  if (!isset($drupal_static_fast)) {
+    $drupal_static_fast['static_extended_search_field_handlers'][$entity_type][$bundle] = &drupal_static(__FUNCTION__);
+  }
+  
+  $field_handlers = &$drupal_static_fast['static_extended_search_field_handlers'][$entity_type][$bundle];
+
+  // Return a new ExtendedSearchFieldHandler object corresponding to the given id.
+  if (!empty($handler_id)) {
+    if (!isset($field_handlers[$handler_id])) {
+      $field_handler_info = extended_search_get_field_handler_info($handler_id);
+      
+      if (!isset($field_handler_info)) {
+        watchdog('extended_search', 'Invalid field handler [!handler].', array('!handler' => $handler_id), WATCHDOG_ERROR);
+        return NULL;
+      }
+      
+      $field_handlers[$handler_id] = extended_search_build_field_handler($field_handler_info, $entity_type, $bundle);
+    }
+    return $field_handlers[$handler_id];
+  }
+  // Else return the full list of Handlers available for the couple entity_type/bundle.
+  else {
+    if (empty($field_handlers)) {
+      $field_handler_info = extended_search_get_field_handler_info();
+      
+      foreach ($field_handler_info as $id => $info) {
+        $field_handlers[$id] = extended_search_build_field_handler($info, $entity_type, $bundle);
+      }
+    }
+    return $field_handlers;
+  }
+}
+
+/**
+ * Helper function to construct an ExtendedSearchFieldHandler object.
+ */
+function extended_search_build_field_handler($handler_info, $entity_type, $bundle) {
+  include_once DRUPAL_ROOT . '/' . drupal_get_path('module', $handler_info['module']) . '/' . $handler_info['file'];
+  
+  $class = $handler_info['class'];
+
+  if (!class_exists($class)) {
+    watchdog('extended_search', 'Invalid field handler: invalid class [!class].', array('!class' => $class), WATCHDOG_ERROR);
+    return NULL;
+  }
+  else {
+    return new $class($handler_info['id'], $entity_type, $bundle);
+  }  
+}
+
+/**
+ * Helper function to include a class file associated to a field handler.
+ */
+function extended_search_include_field_handler($handler_id) {
+  $field_handler_info = extended_search_get_field_handler_info($handler_id);
+  if (isset($field_handler_info)) {
+    include_once DRUPAL_ROOT . '/' . drupal_get_path('module', $field_handler_info['module']) . '/' . $field_handler_info['file'];
+  }
+}
+
+/**
+ * Extended search form.
+ */
+function extended_search_form($form, &$form_state, $extended_search) {
+  if (!isset($form_state['values'])) {
+    $form_state['values'] = array();
+  }
+    
+  if (isset($extended_search)) {
+    $form_state['values'] += (array) $extended_search;
+  }
+
+  // Unset values in case entity_type or bundle has been modified.
+  if (isset($form_state['triggering_element']['#name'])) {
+    switch ($form_state['triggering_element']['#name']) {
+      case 'target_entity_type':
+        unset($form_state['values']['target_bundle']);
+        unset($form_state['input']['target_bundle']);
+      case 'target_bundle':
+        unset($form_state['values']['target_fields']);
+        unset($form_state['input']['target_fields']);
+        break;
+      default:
+        break;
+    }
+  }
+  
+  $form['entity_name'] = array(
+    '#type' => 'machine_name',
+    '#title' => t('Name'),
+    '#required' => TRUE,
+    '#maxlength' => 32,
+    '#default_value' => isset($form_state['values']['entity_name']) ? $form_state['values']['entity_name'] : '',
+    '#machine_name' => array(
+      'exists' => 'extended_search_name_exists',
+    ),
+  );
+  
+  $form['entity_label'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Label'),
+    '#required' => TRUE,
+    '#maxlength' => 64,
+    '#default_value' => isset($form_state['values']['entity_label']) ? $form_state['values']['entity_label'] : '',
+  );
+
+  $form['entity_description'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Description'),
+    '#required' => FALSE,
+    '#default_value' => isset($form_state['values']['entity_description']) ? $form_state['values']['entity_description'] : '',
+  );
+  
+  $entity_types = extended_search_get_entity_types();
+  $entity_type = !empty($form_state['values']['target_entity_type']) ? $form_state['values']['target_entity_type'] : key($entity_types);
+  
+  $form['target_entity_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Entity type'),
+    '#required' => TRUE,
+    '#options' => $entity_types,
+    '#default_value' => $entity_type,
+    '#ajax' => array(
+      'callback' => 'extended_search_bundle_ajax_callback',
+      'effect' => 'fade',
+    ),
+  );
+  
+  $bundles = extended_search_get_bundles($entity_type);
+  $bundle = !empty($form_state['values']['target_bundle']) ? $form_state['values']['target_bundle'] : key($bundles);
+  
+  $form['target_bundle'] = array(
+    '#type' => 'select',
+    '#title' => t('Bundle'),
+    '#required' => TRUE,
+    '#options' => $bundles,
+    '#default_value' => $bundle,
+    '#prefix' => '<div id="edit-target-bundle-wrapper">',
+    '#suffix' => '</div>',
+    '#ajax' => array(
+      'callback' => 'extended_search_form_fields_ajax_callback',
+      'effect' => 'fade',
+    ),
+  );
+  
+  $fields = extended_search_get_fields($entity_type, $bundle);
+  
+  $form['target_fields'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Fields'),
+    '#tree' => TRUE,
+    '#prefix' => '<div id="edit-target-fields-wrapper">',
+    '#suffix' => '</div>',
+    '#theme' => 'extended_search_form_fields',
+  );
+
+  $weight_delta = count($fields) - 1;
+  
+  foreach ($fields as $name => $field) {
+    $handlers = $field['handlers'];
+  
+    $label = isset($form_state['values']['target_fields'][$name]['label']) ? $form_state['values']['target_fields'][$name]['label'] : $field['label'];
+    $handler = isset($form_state['values']['target_fields'][$name]['handler']) ? $form_state['values']['target_fields'][$name]['handler'] : key($handlers);
+    $weight = isset($form_state['values']['target_fields'][$name]['weight']) ? $form_state['values']['target_fields'][$name]['weight'] : $weight_delta;
+    
+    if (!isset($handlers[$handler])) {
+      $handler = key($handlers);
+    }
+    
+    $form['target_fields'][$name] = array(
+      '#type' => 'container',
+      '#tree' => TRUE,
+      'selected' => array(
+        '#type' => 'checkbox',
+        '#default_value' => isset($form_state['values']['target_fields'][$name]),
+      ),
+      'field' => array(
+        '#type' => 'markup',
+        '#markup' => $name,
+      ),
+      'label' => array(
+        '#type' => 'textfield',
+        '#maxlength' => 128,
+        '#default_value' => $label,
+      ),
+      'handler' => array(
+        '#type' => 'select',
+        '#options' => $handlers,
+        '#default_value' => $handler,
+      ),
+      'weight' => array(
+        '#type' => 'weight',
+        '#delta' => $weight_delta,
+        '#default_value' => $weight,
+        '#attributes' => array('class' => array('extended-search-field-weight')),
+      ),
+      '#weight' => $weight,
+    );
+  }
+  
+  $submit = array();
+  if (!empty($form['#submit'])) {
+    $submit += $form['#submit'];
+  }
+  
+  $form['save'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#submit' => $submit + array('extended_search_form_submit'),
+  );
+  
+  return $form;
+}
+
+/**
+ * Exists callback for extend_search machine name.
+ */
+function extended_search_name_exists($value) {
+  $extended_search = entity_load_single('extended_search', $value);
+  return !empty($extended_search);
+}
+
+/**
+ * Ajax callback. Update bundle and fields when entity_type is changed.
+ */
+function extended_search_bundle_ajax_callback($form, $form_state) {  
+  $commands = array();
+  $commands[] = ajax_command_replace('#edit-target-bundle-wrapper', drupal_render($form['target_bundle']));
+  $commands[] = ajax_command_replace('#edit-target-fields-wrapper', drupal_render($form['target_fields']));
+  
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * Ajax callback. Update fields when bundle is changed.
+ */
+function extended_search_form_fields_ajax_callback($form, $form_state) {  
+  $commands = array();
+  $commands[] = ajax_command_replace('#edit-target-fields-wrapper', drupal_render($form['target_fields']));
+  
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * Theme function. Display fields as table.
+ */
+function theme_extended_search_form_fields($variables) {
+  $element = $variables['element'];
+  
+  $rows = array();
+  $header = array(
+    t('Selected'),
+    t('Field'), 
+    t('Label'),
+    t('Handler'),
+    t('Weight'),
+  );
+  foreach (element_children($element) as $key) {
+    $row = array();
+    $row[] = drupal_render($element[$key]['selected']);
+    $row[] = drupal_render($element[$key]['field']);
+    $row[] = drupal_render($element[$key]['label']);
+    $row[] = drupal_render($element[$key]['handler']);
+    $row[] = drupal_render($element[$key]['weight']);
+    $rows[] = array(
+      'data' => $row,
+      'class' => array('draggable'),
+    );
+  }
+  
+  $output = theme('table', array(
+    'header' => $header,
+    'rows' => $rows,
+    'empty' => t('No field found.'),
+    'attributes' => array(
+      'id' => 'extended-search-field-table',
+    ),
+  ));
+  
+  drupal_add_tabledrag('extended-search-field-table', 'order', 'sibling', 'extended-search-field-weight');
+
+  return $output;
+}
+
+/**
+ * Extended search form.
+ */
+function extended_search_form_submit($form, &$form_state) {
+  // Keep only necessary information for fields.
+  foreach ($form_state['values']['target_fields'] as $key => $field) {
+    if (empty($field['selected'])) {
+      unset($form_state['values']['target_fields'][$key]);
+    }
+    else {
+      unset($form_state['values']['target_fields'][$key]['selected']);
+    }
+  }
+
+  // Build the entity and save.
+  $extended_search = entity_ui_controller('extended_search')->entityFormSubmitBuildEntity($form, $form_state);
+  $extended_search->save();
+  
+  // Redirect to the admin page.
+  $info = $extended_search->entityInfo();
+  if (isset($info['admin ui']['path'])) {
+     $form_state['redirect'] = $info['admin ui']['path'];
+  }
+}
+
+/**
+ * Extended search page title callback.
+ */
+function extended_search_page_title($extended_search) {
+  return $extended_search->label();
+}
+
+/**
+ * Extended search page title callback.
+ */
+function extended_search_page_view($extended_search, $view_mode = 'full', $langcode = NULL) {
+  $form_state = array();
+
+  // Get filters from url request.
+  $parameters = extended_search_unpack_query_parameters();
+  
+  if (isset($parameters) && $parameters['entity_name'] === $extended_search->entity_name) {
+    $handlers = $extended_search->getFieldHandlers();
+    $fields = $extended_search->getFields();
+  
+    foreach ($parameters['filters'] as $group_id => $filters) {
+      foreach ($filters as $field_name => $values) {
+        if (isset($handlers[$field_name])) {
+          $handler = $handlers[$field_name];
+          $field_info = $fields[$field_name];
+          
+          foreach ($values as $value) {
+            $value = $handler->getFilterValue($field_name, $field_info, $value);
+            if (isset($value)) {
+              $form_state['values'][$group_id]['filters']['selected'][] = array(
+                'item' => array($field_name => $value),
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  $form_id = 'extended_search_page_form';
+  $form_state['build_info']['args'] = array($extended_search);
+  return drupal_build_form($form_id, $form_state);
+}
+
+function extended_search_page_form($form, &$form_state, $extended_search) {  
+  // Base filter block
+  $base_filters = array(
+    '#type' => 'container',
+    '#attributes' => array('class' => array('extended-search-filters')),
+    '#tree' => TRUE,
+  );
+  
+  $base_filters['select'] = array(
+    '#type' => 'select',
+    '#options' => array(),
+    '#attributes' => array('class' => array('extended-search-filter-select')),
+    '#tree' => TRUE,
+  );
+  
+  $base_filters['input'] = array(
+    '#type' => 'container',
+    '#attributes' => array('class' => array('extended-search-input-container')),
+    '#tree' => TRUE,
+  );
+  
+  $base_filters['add'] = array(
+    '#type' => 'button',
+    '#default_value' => t('Add'),
+    '#attributes' => array('class' => array('extended-search-add-button')),
+    '#ajax' => array(
+      'callback' => 'extended_search_page_form_add_filter_ajax_callback',
+      'event' => 'click',
+    ),
+  );
+  
+  $base_filters['selected'] = array(
+    '#type' => 'container',
+    '#tree' => TRUE,
+    '#attributes' => array('class' => array('extended-search-selected-filters')),
+    '#prefix' => '<div class="extended-search-selected-filters-container">',
+    '#suffix' => '</div>',
+  );
+  
+  $handlers = array();
+  
+  $fields = $extended_search->getFields();
+  $handlers = $extended_search->getFieldHandlers();
+  uasort($fields, 'drupal_sort_weight');
+
+  // Field handlers
+  foreach ($fields as $field_name => $field_info) {
+    if (!isset($handlers[$field_name]) || !method_exists($handlers[$field_name], 'buildInput')) {
+      unset($fields[$field_name]);
+    }
+    else {
+      $base_filters['input'][$field_name] = $handlers[$field_name]->buildInput($field_name);
+      $base_filters['select']['#options'][$field_name] = $field_info['label'];
+    }
+  }
+  
+  // Triggering element.
+  $triggering_element = isset($form_state['triggering_element']) ? $form_state['triggering_element'] : NULL;
+
+  // Filtering groups
+  $groups = extended_search_get_groups();
+  
+  foreach ($groups as $group_id => $group_info) {
+    $filters = $base_filters;
+  
+    // Already selected filters.
+    if (isset($form_state['values'][$group_id]['filters']['selected'])) {
+      foreach ($form_state['values'][$group_id]['filters']['selected'] as $index => $filter) {
+        // Do not add if the triggering element is the associated remove button.
+        if (!isset($triggering_element) || $triggering_element['#array_parents'] != array($group_id, 'filters', 'selected', $index, 'remove')) {
+          foreach ($filter['item'] as $field_name => $field_value) {
+            if (isset($handlers[$field_name])) {
+              $field_info = $fields[$field_name];
+              $handler = $handlers[$field_name];
+              
+              // Add filter
+              extended_search_page_form_add_selected_filter($filters['selected'], $group_id, $field_name, $field_value, $field_info, $handler);
+            }
+          }
+        }
+      }
+    }
+  
+    // Set visible state.
+    foreach ($fields as $field_name => $field_info) {
+      $classes = array(
+        'extended-search-filter-input-' . $group_id,
+        'extended-search-filter-input-' . $group_id . '-' . extended_search_format_field_name($field_name),
+      );
+      $filters['input'][$field_name]['#prefix'] = '<div class="' . implode(' ', $classes) . '">';
+      $filters['input'][$field_name]['#suffix'] = '</div>';
+    }
+    
+    // Ajax wrapper
+    $filters['selected']['#prefix'] = '<div id="extended-search-' . $group_id . '-filters-selected">';
+    $fitlers['selected']['#suffix'] = '</div>';
+    
+    $filters['add']['#name'] = $group_id . '_add';
+    
+    $form[$group_id] = array(
+      '#type' => 'fieldset',
+      '#title' => $group_info['label'],
+      '#tree' => TRUE,
+      'filters' => $filters,
+    );
+  }
+  
+  // Addition of a new filter.
+  if (isset($triggering_element['#array_parents'][0])) {
+    $group_id = $triggering_element['#array_parents'][0];
+    
+    if ($triggering_element['#array_parents'] == array($group_id, 'filters', 'add')) {
+      $field_name = $form_state['values'][$group_id]['filters']['select'];    
+    
+      // Current filter.
+      if (!empty($form_state['values'][$group_id]['filters']['input'][$field_name])) {
+        $field_info = $fields[$field_name];
+        $field_value = $form_state['values'][$group_id]['filters']['input'][$field_name];
+        
+        $handler = $handlers[$field_name];
+        
+        $filters = &$form[$group_id]['filters'];
+        
+        // Add filter
+        extended_search_page_form_add_selected_filter($filters['selected'], $group_id, $field_name, $field_value, $field_info, $handler);
+        
+        // Reset to default value.
+        unset($form_state['input'][$group_id]['filters']['input'][$field_name]);
+      }
+    }
+  }
+  
+  // Submit
+  $submit = array();
+  if (!empty($form['#submit'])) {
+    $submit += $form['#submit'];
+  }
+  
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Search'),
+    '#submit' => $submit + array('extended_search_page_form_submit'),
+  );
+  
+  $form['#attached']['css'] = array(
+    drupal_get_path('module', 'extended_search') . '/css/page.form.css',
+  );
+  
+  $form['#attached']['js'] = array(
+    drupal_get_path('module', 'extended_search') . '/js/page.form.js',
+  );
+  
+  $form_state['extended_search'] = $extended_search;
+  
+  return $form;
+}
+
+/**
+ * Add a filter.
+ */
+function extended_search_page_form_add_selected_filter(&$selected_filters, $group_id, $field_name, $field_value, $field_info, $handler) {
+  $label = $field_info['label'];
+  $value = $handler->getFilter($field_name, $field_info, $field_value);
+  
+  $index = count(element_children($selected_filters));
+  
+  $element = array(
+    '#type' => 'container',
+    '#tree' => TRUE,
+    '#attributes' => array(
+      'class' => array('extended-search-filter'),
+    ),
+  );
+  
+  $element['markup'] = array(
+    '#type' => 'markup',
+    '#markup' =>  '<div class="extended-search-filter-label">' . $label . '</div>' .
+                  '<div class="extended-search-filter-value">' . $value['display'] . '</div>',
+  );
+  
+  $element['remove'] = array(
+    '#type' => 'button',
+    '#default_value' => t('remove'),
+    '#name' => $group_id . '_remove_' . $index,
+    '#attributes' => array('class' => array('extended-search-remove-button')),
+    '#ajax' => array(
+      'callback' => 'extended_search_page_form_remove_filter_ajax_callback',
+      'event' => 'click',
+    ),
+  );
+  
+  $element['item'] = array(
+    '#type' => 'container',
+    '#tree' => TRUE,
+    '#attributes' => array(
+      'class' => array('extended-search-filter-item'),
+    ),
+  );
+  
+  $element['item'][$field_name] = array(
+    '#type' => 'hidden',
+    '#value' => $value['value'],
+  );
+  
+  $selected_filters[] = $element;
+}
+
+function theme_extended_search_page_filter(&$variables) {
+  
+}
+
+/**
+ * Page form submit.
+ */
+function extended_search_page_form_submit($form, &$form_state) {
+  $extended_search = $form_state['extended_search'];
+  
+  $handlers = $extended_search->getFieldHandlers();
+  
+  $fields = $extended_search->getFields();
+
+  $filters = array();
+  
+  foreach (extended_search_get_groups() as $group_id => $group_info) {
+    if (isset($form_state['values'][$group_id]['filters']['selected'])) {
+      foreach ($form_state['values'][$group_id]['filters']['selected'] as $element) {
+        foreach ($element['item'] as $field_name => $value) {
+          if (isset($handlers[$field_name])) {
+            $field_info = $fields[$field_name];
+            
+            // Get real value (like tid for taxonomy_term and so on.
+            $value = $handlers[$field_name]->getValue($field_name, $field_info, $value);
+            
+            $filters[$group_id][$field_name][] = $value;
+          }
+        }
+      }
+    }
+  }
+  
+  $search_query = drupal_json_encode(array(
+    'entity_name' => $extended_search->entity_name,
+    'filters' => $filters,
+  ));
+  
+  $options = array('query' => drupal_get_query_parameters());
+  $options['query']['extended_search'] = $search_query;
+  
+  $form_state['redirect'] = array(drupal_get_path(), $options);
+}
+
+/**
+ * Ajax callback to add a filter.
+ */
+function extended_search_page_form_add_filter_ajax_callback($form, $form_state) {
+  $group_id = $form_state['triggering_element']['#array_parents'][0];
+  
+  $field_name = extended_search_format_field_name($form_state['values'][$group_id]['filters']['select']);
+  
+  $commands = array();
+  $commands[] = ajax_command_invoke("#edit-{$group_id}-filters-input-{$field_name}", 'val', array(''));
+  $commands[] = ajax_command_replace('#extended-search-' . $group_id . '-filters-selected', drupal_render($form[$group_id]['filters']['selected']));
+  
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * Ajax callback to remove a filter.
+ */
+function extended_search_page_form_remove_filter_ajax_callback($form, $form_state) {
+  $group_id = $form_state['triggering_element']['#array_parents'][0];
+
+  $commands = array();
+  $commands[] = ajax_command_replace('#extended-search-' . $group_id . '-filters-selected', drupal_render($form[$group_id]['filters']['selected']));
+  
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * Return an autocomplete path of a given handler.
+ */
+function extended_search_get_autocomplete_path($handler_id, $entity_type, $bundle, $field_name) {
+  return "extended_search/autocomplete/{$handler_id}/{$entity_type}/{$bundle}/{$field_name}";
+}
+
+/**
+ * Autocomplete callback.
+ */
+function extended_search_autocomplete_callback($handler_id, $entity_type, $bundle, $field_name, $string = '') {
+  watchdog('autocomplete', dprint_r(array($handler_id, $entity_type, $bundle, $string), TRUE));
+  
+  $result = array();
+  
+  $handler = extended_search_get_field_handler($entity_type, $bundle, $handler_id);
+  if (isset($handler)) {
+    $result = $handler->autocomplete($field_name, $string);
+  }
+  
+  drupal_json_output($result); 
+}
+
+/**
+ * Implements hook_extended_search_allowed_entity_types_alter().
+ */
+function extended_search_extended_search_allowed_entity_types_alter(&$allowed_entity_types) {
+  $allowed_entity_types += array(
+    'node' => 'node',
+    'taxonomy_term' => 'taxonomy_term',
+  );
+}
+
+/**
+ * Implements hook_extended_search_field_handler_info().
+ */
+function extended_search_extended_search_field_handler_info() {
+  $handlers = array();
+  
+  $handlers['text'] = array(
+    'label' => t('Text'),
+    'description' => t('Text field handler'),
+    'class' => 'ExtendedSearchFieldHandlerText',
+    'module' => 'extended_search',
+    'file' => 'plugins/ExtendedSearchFieldHandlerText.inc',
+    'schema types' => array(
+      'text',
+      'varchar',
+      'char',
+      'blob',
+    ),
+    'field types' => array(
+      'text',
+      'text_with_summary',
+    ),
+  );
+  
+  $handlers['numeric'] = array(
+    'label' => t('Numeric'),
+    'description' => t('Numeric field handler'),
+    'class' => 'ExtendedSearchFieldHandlerNumeric',
+    'module' => 'extended_search',
+    'file' => 'plugins/ExtendedSearchFieldHandlerNumeric.inc',
+    'schema types' => array(
+      'serial',
+      'int',
+      'float',
+      'numeric',
+    ),
+  );
+  
+  $handlers['date'] = array(
+    'label' => t('Date'),
+    'description' => t('Date field handler'),
+    'class' => 'ExtendedSearchFieldHandlerDate',
+    'module' => 'extended_search',
+    'file' => 'plugins/ExtendedSearchFieldHandlerDate.inc',
+    'schema types' => array(
+      'int',
+    ),
+    'field types' => array(
+      'datetime',
+      'datestamp',
+    ),
+  );
+  
+  $handlers['taxonomy_term'] = array(
+    'label' => t('Taxonomy term'),
+    'description' => t('Taxonomy term reference field handler'),
+    'class' => 'ExtendedSearchFieldHandlerTaxonomyTerm',
+    'module' => 'extended_search',
+    'file' => 'plugins/ExtendedSearchFieldHandlerTaxonomyTerm.inc',
+    'field types' => array(
+      'taxonomy_term_reference',
+    ),
+  );
+  
+  // TODO:
+  // - list_integer,
+  // - list_boolean,
+  // - image,
+  // - file,
+  
+  return $handlers;
+}
+
+/**
+ * Implements hook_block_info.
+ */
+function extended_search_block_info() {
+  $blocks = array();
+
+  $entity_names = db_query('SELECT entity_name, entity_label FROM {extended_search_entity}')->fetchAllKeyed();
+  
+  foreach ($entity_names as $entity_name => $entity_label) {
+    $blocks[$entity_name] = array(
+      'info' => t('Extended Search: ' . $entity_label),
+      'cache' => DRUPAL_NO_CACHE,
+    );
+  }
+  
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view.
+ */
+function extended_search_block_view($delta = '') {
+  $block = array();
+
+  $extended_search = extended_search_load($delta);
+  
+  if (isset($extended_search)) {
+    $block['subject'] = t('Extended Search');
+    $block['content'] = extended_search_page_view($extended_search);
+  }
+  
+  return $block;
+}
+
+/**
+ * Implements hook_views_pre_execute().
+ */
+function extended_search_views_query_alter(&$view, &$query) {
+  $class = 'searchlight_plugin_query';
+  if ($query instanceof $class) {
+    
+    $parameters = extended_search_unpack_query_parameters(TRUE);
+    if (isset($parameters)) {
+      $extended_search = $parameters['extended_search'];
+      $filters = $parameters['filters'];
+      
+      $entity_info = entity_get_info($extended_search->target_entity_type);
+      $base_table = $entity_info['base table'];
+      
+      $fields_info = field_info_fields();
+      
+      $fields = $extended_search->getFields();
+      $handlers = $extended_search->getFieldHandlers();
+            
+      $search_query = array();
+      $search_filters = array();
+            
+      $groups = extended_search_get_groups();
+      
+      if (!empty($query->search_query)) {
+        $search_query[] = $query->search_query;
+      }    
+      
+      foreach ($filters as $group_id => $group_filters) {
+        $group_info = $groups[$group_id];
+        
+        $search_query_group = array();
+        $search_filters_group = array();
+        
+        $inverse = $group_info['inverse'];
+        
+        foreach ($group_filters as $field_name => $values) {
+        
+          if (isset($handlers[$field_name])) {
+            $handler = $handlers[$field_name];          
+            $field_info = $fields[$field_name];
+            $type = $handler->getType($field_name, $field_info);
+            
+            if (isset($fields_info[$field_name])) {
+              $field_table = 'field_data_' . $field_name;
+            }
+            else {
+              $field_table = $base_table;
+            }
+            
+            $field_alias = "{$field_table}_{$field_name}";
+            
+            // Prepare the filters.
+            foreach ($values as $value) {
+              switch ($type) {
+                case 'text':
+                  $search_query_group[] = ($inverse ? '!' : '') . "(@{$field_alias} {$value})";
+                  break;
+                case 'date':
+                  $search_filters_group[] = array(
+                    'field' => $field_alias,
+                    'operator' => ($inverse ? 'NOT ' : '') . 'BETWEEN',
+                    'value' => array_values($value),
+                  );
+                  break;
+                case 'numeric':
+                  $search_filters_group[] = array(
+                    'field' => $field_alias,
+                    'operator' => ($inverse ? '<>' : '='),
+                    'value' => $value,
+                  );
+                  break;
+                case 'taxonomy_term':
+                  if ($base_table === 'node') {
+                    $field_alias = 'taxonomy_index_tid_' . $handler->getVocabulary($field_name);
+                  }
+                
+                  $search_filters_group[] = array(
+                    'field' => $field_alias,
+                    'operator' => ($inverse ? 'NOT ' : '') . 'IN',
+                    'value' => $value,
+                  );
+                  break;
+              }
+            }
+          }
+        }
+        
+        if (!empty($search_query_group)) {
+          // Do not add "NOT" type search query if there is no other query 
+          // as it's not computable by sphinx. 
+          // @see http://sphinxsearch.com/docs/manual-0.9.9.html#extended-syntax
+          if (!$inverse || !empty($search_query)) {
+            $search_query[] = implode($group_info['separator'], $search_query_group);
+          }
+        }
+        if (!empty($search_filters_group)) {
+          $search_filters[] = array($group_info['type'] => $search_filters_group);
+        }
+      }
+    }
+    
+    // Set up the correct buildmode.
+    $query->search_buildmode = 'search';
+    
+    if (!empty($search_query)) {
+      $query->set_search_query('(' . implode(') (', $search_query) . ')');
+    }
+    
+    // Add the search filters to the current searchlight query.
+    foreach ($search_filters as $search_filter) {
+      foreach ($search_filter as $group_type => $filters) {
+        if (!empty($filters)) {
+          $group = $query->set_where_group($group_type, NULL);
+          foreach ($filters as $filter) {
+            $query->add_search_filter($group, $filter['field'], $filter['value'], $filter['operator'], $group_type);
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Helper function to get unpack extended_search query parameter
+ * and eventually load the associated extended_search.
+ */
+function extended_search_unpack_query_parameters($load = FALSE) {
+  $query_parameters = drupal_get_query_parameters();
+  
+  if (isset($query_parameters['extended_search'])) {
+    $parameters = drupal_json_decode($query_parameters['extended_search']);
+    if ($load === TRUE) {
+      $parameters['extended_search'] = extended_search_load($parameters['entity_name']);
+    }
+    return $parameters;
+  }
+  
+  return NULL;
+}
+
+/**
+ * Helper function to get a formatted field name suitable to use in class names.
+ */
+function extended_search_format_field_name($field_name) {
+  return strtr(drupal_strtolower($field_name), array(' ' => '-', '_' => '-', '[' => '-', ']' => ''));
+}
+
+/**
+ * Get filter groups.
+ */
+function extended_search_get_groups() {
+  return array(
+    'any' => array(
+      'label' => t('Any of'),
+      'type' => 'OR',
+      'separator' => ' | ',
+      'inverse' => FALSE,
+    ),
+    'all' => array(
+      'label' => t('All of'),
+      'type' => 'AND',
+      'separator' => ' ',
+      'inverse' => FALSE,
+    ),
+    'not' => array(
+      'label' => t('None of'),
+      'type' => 'AND',
+      'separator' => ' ',
+      'inverse' => TRUE,
+    ),
+  );
+}
