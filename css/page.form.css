@@ -1,22 +1,51 @@
 .extended-search-filter {
   position: relative;
-  padding: 7px;
+  padding: 3px 5px 5px 5px;
   margin-top: 5px;
-  background-color: #F4F4F4;
+  background-color: #6E6E6E;
   color: #333333;
-  border-radius: 5px;
+  border-radius: 3px;
 }
 .extended-search-filter-label {
-  margin-bottom: 5px;
+  margin-bottom: 3px;
+  color: #FFFFFF;
   font-weight: bold;
+  font-size: 0.8em !important;
 }
 .extended-search-filter-value {
-  padding: 5px;
+  padding: 3px 5px;
   background-color: #FFFFFF;
-  border-radius: 5px;
+  color: #6E6E6E !important;
+  border-radius: 3px;
 }
 .extended-search-remove-button {
   position: absolute;
   right: 5px;
   top: 5px;
+  background: none !important;
+  border: none !important;
+  padding: 0px !important;
+  color: #CCCCCC !important;
+  font-size: 0.8em !important;
+}
+.extended-search-remove-button:hover {
+  color: #FF0000 !important;
+}
+
+/*.block-extended-search {
+  padding: 0px !important;
+}*/
+
+.block-extended-search .block-title {
+  padding: 0px !important;
+  background: url("/profiles/reliefweb/themes/kobe/images/sprite.png") repeat scroll 100% -340px transparent !important;
+}
+.block-extended-search.extended-search-expanded .block-title {
+  background-position: 100% -370px !important;
+}
+.block-extended-search > .block-content {
+  display: none;
+}
+.block-extended-search.extended-search-expanded > .block-content {
+  display: block;
 }

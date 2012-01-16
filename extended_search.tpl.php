@@ -5,7 +5,7 @@
  * A basic template for model entities
  *
  * Available variables:
- * - $title: An array of
+ * - $content: a drupal renderable array.
  */
 ?>
 <div><?php print drupal_render($content); ?></div>

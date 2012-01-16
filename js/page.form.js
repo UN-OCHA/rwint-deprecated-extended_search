@@ -12,6 +12,15 @@
       $('select.extended-search-filter-select').change(function (event) {
         showInput(this);
       }).each(function () {showInput(this);});
+      
+      // Extended search collapsibility.
+      $('.block-extended-search').each(function () {
+        var block = $(this);
+        $('.block-title', this).click(function () {
+          block.toggleClass('extended-search-expanded');
+          return false;
+        });
+      });
     }
   };
 })(jQuery);

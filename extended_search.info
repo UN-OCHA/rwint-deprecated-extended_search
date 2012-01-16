@@ -4,7 +4,7 @@ description = "Extended search query builder."
 name = "Extended search"
 package = "Search"
 
-files[] = includes/field_handlers.inc
+files[] = includes/field_handler.inc
 files[] = extended_search.admin.inc
 files[] = extended_search.controller.inc
 files[] = extended_search.inc
