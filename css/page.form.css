@@ -1,4 +1,62 @@
-.extended-search-filter {
+.extended-search-page-form .tabledrag-toggle-weight-wrapper,
+.extended-search-page-form .extended-search-filter-input-hidden {
+  display: none;
+}
+.extended-search-page-form table.tabledrag-processed tbody>:first-child .extended-search-filter-operator  {
+  visibility: hidden;
+}
+.extended-search-page-form table {
+  border-collapse:collapse !important;
+}
+.extended-search-page-form table,th, td {
+  border: 1px solid #DDDDDD !important;
+}
+
+.extended-search-page-form th.extended-search-filter-operator-header {
+  width: 20%;
+}
+.extended-search-page-form th.extended-search-filter-value-header {
+  width: 65%;
+}
+.extended-search-page-form th.extended-search-filter-weight-header {
+  display: none;
+  width: 0px;
+}
+.extended-search-page-form th.extended-search-filter-remove-header {
+  width: 15%;
+}
+
+.extended-search-page-form td.extended-search-filter-operator-cell {
+  width: 20%;
+}
+.extended-search-page-form td.extended-search-filter-value-cell {
+  width: 65%;
+}
+.extended-search-page-form td.extended-search-filter-weight-cell {
+  display: none;
+  width: 0px;
+}
+.extended-search-page-form td.extended-search-filter-remove-cell {
+  width: 15%;
+  text-align: center;
+}
+
+.extended-search-page-form .extended-search-filter-input .form-type-date,
+.extended-search-page-form .extended-search-filter-input .form-type-date label,
+.extended-search-page-form .extended-search-filter-input .form-type-date .container-inline {
+  display: inline !important;
+}
+
+.extended-search-page-form .extended-search-filter-input .form-type-date .container-inline {
+  margin: 0px 30px 0px 15px !important;
+}
+
+.extended-search-page-form .extended-search-filter-input {
+  border: 1px solid #DDDDDD !important;
+  padding: 3px 8px;
+}
+
+/*.extended-search-filter {
   position: relative;
   padding: 3px 5px 5px 5px;
   margin-top: 5px;
@@ -30,13 +88,13 @@
 }
 .extended-search-remove-button:hover {
   color: #FF0000 !important;
-}
+}*/
 
 /*.block-extended-search {
   padding: 0px !important;
 }*/
 
-.block-extended-search .block-title {
+/*.block-extended-search .block-title {
   padding: 0px !important;
   background: url("/profiles/reliefweb/themes/kobe/images/sprite.png") repeat scroll 100% -340px transparent !important;
 }
@@ -48,4 +106,4 @@
 }
 .block-extended-search.extended-search-expanded > .block-content {
   display: block;
-}
+}*/

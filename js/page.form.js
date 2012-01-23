@@ -1,25 +1,14 @@
 (function ($) {
   Drupal.behaviors.extendedSearch = {
-    attach: function (context, settings) {          
-      function showInput(select) {
-        var group = select.id.substring(5, select.id.indexOf('-', 5));
-        var value = select.value.replace(/[_ ]/g, '-');
-        var target = '.extended-search-filter-input-' + group + '-' + value;
-        $('.extended-search-filter-input-' + group + ':not(' + target + ')').hide();
-        $(target).show();
-      }
+    attach: function (context, settings) {
+      Drupal.theme.tableDragChangedWarning = function () {return '';};
       
-      $('select.extended-search-filter-select').change(function (event) {
-        showInput(this);
-      }).each(function () {showInput(this);});
-      
-      // Extended search collapsibility.
-      $('.block-extended-search').each(function () {
-        var block = $(this);
-        $('.block-title', this).click(function () {
-          block.toggleClass('extended-search-expanded');
-          return false;
-        });
+      $('select.extended-search-filter-category-select').change(function (event) {
+        var self = $(this);
+        var value = self.val().replace(/[_ ]/g, '-');
+        var target = '.extended-search-filter-input-' + value;
+        $('.extended-search-filter-input').addClass('extended-search-filter-input-hidden');
+        $(target + ' .extended-search-filter-input').removeClass('extended-search-filter-input-hidden');
       });
     }
   };

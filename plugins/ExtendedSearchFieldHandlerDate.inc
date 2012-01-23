@@ -31,8 +31,15 @@ class ExtendedSearchFieldHandlerDate extends ExtendedSearchFieldHandlerBase {
     $display_from = gmstrftime('%d/%m/%Y', $value_from);
     $display_to = gmstrftime('%d/%m/%Y', $value_to);
     
+    if ($value_from == $value_to) {
+      $display = 'On ' . $display_from;
+    }
+    else {
+      $display = 'From ' . $display_from . ' to ' . $display_to;
+    }
+    
     return array(
-      'display' => $display_from . ' - ' . $display_to,
+      'display' => $display,
       'value' => $value_from . '-' . $value_to,
     );
   }
