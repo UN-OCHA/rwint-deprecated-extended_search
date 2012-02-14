@@ -10,8 +10,15 @@ class ExtendedSearchFieldHandlerTaxonomyTerm extends ExtendedSearchFieldHandlerB
   }
   
   public function getFilter($field_name, $field_info, $value) {
+    if (is_numeric($value)) {
+      $display = $this->getFilterValue($field_name, $field_info, $value);
+    }
+    else {
+      $display = "{$value}";
+    }
+    
     return array(
-      'display' => "{$value}",
+      'display' => $display,
       'value' => $value,
     );
   }

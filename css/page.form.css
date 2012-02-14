@@ -41,69 +41,41 @@
   text-align: center;
 }
 
-.extended-search-page-form .extended-search-filter-input .form-type-date,
-.extended-search-page-form .extended-search-filter-input .form-type-date label,
-.extended-search-page-form .extended-search-filter-input .form-type-date .container-inline {
-  display: inline !important;
-}
-
-.extended-search-page-form .extended-search-filter-input .form-type-date .container-inline {
-  margin: 0px 30px 0px 15px !important;
-}
-
-.extended-search-page-form .extended-search-filter-input {
+.extended-search-page-form .extended-search-filter-input:first-child  .form-type-date {
   border: 1px solid #DDDDDD !important;
   padding: 3px 8px;
 }
 
-/*.extended-search-filter {
-  position: relative;
-  padding: 3px 5px 5px 5px;
-  margin-top: 5px;
-  background-color: #6E6E6E;
-  color: #333333;
-  border-radius: 3px;
+.extended-search-page-form .extended-search-explanation {
+  font-size: 0.8em;
+  font-style: italic;
+  margin: 0px 0px 8px 0px;
 }
-.extended-search-filter-label {
-  margin-bottom: 3px;
-  color: #FFFFFF;
+
+.extended-search-page-form .extended-search-query {
+  font-size: 0.9em;
+  margin:3px 0px 8px 0px;
+}
+
+.extended-search-page-form .extended-search-query-label {
   font-weight: bold;
-  font-size: 0.8em !important;
+  margin-bottom: 2px;
 }
-.extended-search-filter-value {
+
+.extended-search-page-form .extended-search-query-query {
+  /*border: 1px solid #DDDDDD !important;*/
   padding: 3px 5px;
-  background-color: #FFFFFF;
-  color: #6E6E6E !important;
-  border-radius: 3px;
+  color: #555555;
+  white-space: pre-wrap;
 }
-.extended-search-remove-button {
-  position: absolute;
-  right: 5px;
-  top: 5px;
-  background: none !important;
-  border: none !important;
-  padding: 0px !important;
-  color: #CCCCCC !important;
-  font-size: 0.8em !important;
-}
-.extended-search-remove-button:hover {
-  color: #FF0000 !important;
-}*/
 
-/*.block-extended-search {
-  padding: 0px !important;
-}*/
-
-/*.block-extended-search .block-title {
-  padding: 0px !important;
-  background: url("/profiles/reliefweb/themes/kobe/images/sprite.png") repeat scroll 100% -340px transparent !important;
+.extended-search-page-form legend{
+  text-transform: uppercase;
+  font-size: 10px;
+  color: #999999 !important;
+  font-weight: bold;
+  
 }
-.block-extended-search.extended-search-expanded .block-title {
-  background-position: 100% -370px !important;
+.extended-search-page-form fieldset{
+  margin-bottom: 15px !important;
 }
-.block-extended-search > .block-content {
-  display: none;
-}
-.block-extended-search.extended-search-expanded > .block-content {
-  display: block;
-}*/
