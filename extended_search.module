@@ -694,7 +694,7 @@ function extended_search_page_view($extended_search, $view_mode = 'full', $langc
 function extended_search_full_text_search_form($form, &$form_state, $extended_search) {
   $form['full_text_search'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Enter Keywords'),
+    '#title' => t('Full text search'),
     '#tree' => TRUE,
   );
   
@@ -711,7 +711,7 @@ function extended_search_full_text_search_form($form, &$form_state, $extended_se
   
   $form['full_text_search']['exact'] = array(
     '#type' => 'textfield',
-    '#title' => t('With the extact phrase'),
+    '#title' => t('With the exact phrase'),
     '#default_value' => $form_state['values']['full_text_search']['exact'],
   );
   
@@ -734,33 +734,44 @@ function extended_search_full_text_search_form($form, &$form_state, $extended_se
  * Extended search - filter block form.
  */
 function extended_search_filters_form($form, &$form_state, $extended_search) {
-  $form['filter_addition'] = array(
+  $form['filters'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Add filters'),
+    '#title' => t('Filter using ReliefWeb categories'),
+    '#tree' => FALSE,
+  );  
+  
+  /*$form['filters']['explanation'] = array(
+    '#markup' => '<div class="extended-search-explanation">* ' . t('Filter using ReliefWeb categories.') . '</div>',
+    '#weight' => -100,
+  );*/
+  
+  $form['filters']['filter_addition'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('>> Add a filter'),
     '#tree' => TRUE,
   );
   
-  $form['filter_addition']['explanation'] = array(
+  $form['filters']['filter_addition']['explanation'] = array(
     '#markup' => '<div class="extended-search-explanation">* ' . t('Select a category and enter a term or date to narrow down your search.') . '</div>',
     '#weight' => -100,
   );
   
-  $form['filter_addition']['category'] = array(
+  $form['filters']['filter_addition']['category'] = array(
     '#type' => 'select',
     '#options' => array(),
     '#attributes' => array('class' => array('extended-search-filter-category-select')),
     '#tree' => TRUE,
   );
   
-  $form['filter_addition']['input'] = array(
+  $form['filters']['filter_addition']['input'] = array(
     '#type' => 'container',
     '#attributes' => array('class' => array('extended-search-filter-input-container')),
     '#tree' => TRUE,
   );
   
-  $form['filter_addition']['add'] = array(
+  $form['filters']['filter_addition']['add'] = array(
     '#type' => 'button',
-    '#default_value' => t('Add'),
+    '#default_value' => t('Add to the selection'),
     '#attributes' => array('class' => array('extended-search-filter-add-button')),
     '#ajax' => array(
       'callback' => 'extended_search_page_form_add_filter_ajax_callback',
@@ -772,8 +783,8 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
   $handlers = $extended_search->getFieldHandlers();
   uasort($fields, 'drupal_sort_weight');
   
-  if (isset($form_state['field_addition']['category'])) {
-    $category = $form_state['field_addition']['category'];
+  if (isset($form_state['values']['filter_addition']['category'])) {
+    $category = $form_state['values']['filter_addition']['category'];
   }
   else {
     $category = key($fields);
@@ -787,31 +798,31 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
     else {
       $class = 'extended-search-filter-input-' . extended_search_format_field_name($field_name);
       
-      $form['filter_addition']['input'][$field_name] = $handlers[$field_name]->buildInput($field_name);
-      $form['filter_addition']['input'][$field_name]['#prefix'] = '<div class="' . $class . '">';
-      $form['filter_addition']['input'][$field_name]['#suffix'] = '</div>';
-      $form['filter_addition']['input'][$field_name]['#attributes'] = array(
+      $form['filters']['filter_addition']['input'][$field_name] = $handlers[$field_name]->buildInput($field_name);
+      $form['filters']['filter_addition']['input'][$field_name]['#prefix'] = '<div class="' . $class . '">';
+      $form['filters']['filter_addition']['input'][$field_name]['#suffix'] = '</div>';
+      $form['filters']['filter_addition']['input'][$field_name]['#attributes'] = array(
         'class' => array('extended-search-filter-input'),
       );
       
       if ($category !== $field_name) {
-        $form['filter_addition']['input'][$field_name]['#attributes']['class'][] = 'extended-search-filter-input-hidden';
+        $form['filters']['filter_addition']['input'][$field_name]['#attributes']['class'][] = 'extended-search-filter-input-hidden';
       }
       
-      $form['filter_addition']['category']['#options'][$field_name] = $field_info['label'];
+      $form['filters']['filter_addition']['category']['#options'][$field_name] = $field_info['label'];
     }
   }
     
   // Filter selection
-  $form['filter_selection'] = array(
+  $form['filters']['filter_selection'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Manage selection'),
+    '#title' => t('>> Manage selection'),
     '#tree' => TRUE,
     '#prefix' => '<div id="extended-search-filter-selection">',
     '#suffix' => '</div>',
   );
   
-  $form['filter_selection']['explanation'] = array(
+  $form['filters']['filter_selection']['explanation'] = array(
     '#markup' => '<div class="extended-search-explanation">* ' . t('Change how filters are linked together (drag to re-order).') . '</div>',
     '#weight' => -100,
   );
@@ -823,7 +834,7 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
     foreach ($form_state['values']['filter_selection'] as $field_name => $filters) {
       foreach ($filters as $index => $filter) {
         // Do not add if the triggering element is the associated remove button.
-        if (!isset($triggering_element) || $triggering_element['#array_parents'] != array('filter_selection', $field_name, $index, 'remove')) {
+        if (!isset($triggering_element) || $triggering_element['#array_parents'] != array('filters', 'filter_selection', $field_name, $index, 'remove')) {
           if (isset($handlers[$field_name])) {
             $field_value = $filter['item'][$field_name];
             $field_info = $fields[$field_name];
@@ -833,7 +844,7 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
             $operator = isset($filter['operator']) ? $filter['operator'] : NULL;
             
             // Add filter
-            extended_search_page_form_add_selected_filter($form['filter_selection'], $field_name, $field_value, $field_info, $handler, $operator, $weight);
+            extended_search_page_form_add_selected_filter($form['filters']['filter_selection'], $field_name, $field_value, $field_info, $handler, $operator, $weight);
           }
         }
       }
@@ -841,7 +852,7 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
   }
 
   // Filter addition
-  if ($triggering_element['#array_parents'] == array('filter_addition', 'add')) {
+  if ($triggering_element['#array_parents'] == array('filters', 'filter_addition', 'add')) {
     $field_name = $form_state['values']['filter_addition']['category'];
   
     // Current filter.
@@ -851,14 +862,14 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
       $handler = $handlers[$field_name];
       
       // Add filter
-      extended_search_page_form_add_selected_filter($form['filter_selection'], $field_name, $field_value, $field_info, $handler);
+      extended_search_page_form_add_selected_filter($form['filters']['filter_selection'], $field_name, $field_value, $field_info, $handler);
       
       // Reset to default value.
       unset($form_state['input']['filter_addition']['input'][$field_name]);
     }
   }
   
-  ksort($form['filter_selection']);
+  ksort($form['filters']['filter_selection']);
   
   return $form;
 }
@@ -900,8 +911,8 @@ function extended_search_page_form($form, &$form_state, $extended_search) {
   if (!empty($form['#submit'])) {
     $submit += $form['#submit'];
   }
-  
-  $form['submit'] = array(
+
+  $form['search_query']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Search'),
     '#submit' => $submit + array('extended_search_page_form_submit'),
@@ -929,7 +940,7 @@ function extended_search_page_form($form, &$form_state, $extended_search) {
 /**
  * Add a filter.
  */
-function extended_search_page_form_add_selected_filter(&$selection, $field_name, $field_value, $field_info, $handler, $operator = 'and', $weight = NULL) {
+function extended_search_page_form_add_selected_filter(&$selection, $field_name, $field_value, $field_info, $handler, $operator = 'or', $weight = NULL) {
   $label = $field_info['label'];
   $value = $handler->getFilter($field_name, $field_info, $field_value);
   
@@ -964,7 +975,7 @@ function extended_search_page_form_add_selected_filter(&$selection, $field_name,
     '#options' => array(
       'and' => t('AND'),
       'or' => t('OR'),
-      'not' => t('EXCLUDE'),
+      'not' => t('NOT'),
     ),
     '#default_value' => $operator,
     '#attributes' => array('class' => array('extended-search-filter-operator')),
@@ -1144,7 +1155,7 @@ function extended_search_page_form_add_filter_ajax_callback($form, $form_state) 
   
   $commands = array();
   $commands[] = ajax_command_invoke("#edit-filter-addition-input-{$field_name}", 'val', array(''));
-  $commands[] = ajax_command_replace('#extended-search-filter-selection', drupal_render($form['filter_selection']));
+  $commands[] = ajax_command_replace('#extended-search-filter-selection', drupal_render($form['filters']['filter_selection']));
   
   return array('#type' => 'ajax', '#commands' => $commands);
 }
@@ -1154,7 +1165,7 @@ function extended_search_page_form_add_filter_ajax_callback($form, $form_state) 
  */
 function extended_search_page_form_remove_filter_ajax_callback($form, $form_state) {
   $commands = array();
-  $commands[] = ajax_command_replace('#extended-search-filter-selection', drupal_render($form['filter_selection']));
+  $commands[] = ajax_command_replace('#extended-search-filter-selection', drupal_render($form['filters']['filter_selection']));
   
   return array('#type' => 'ajax', '#commands' => $commands);
 }

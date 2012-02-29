@@ -15,22 +15,22 @@
       function get_text_query() {
         var query = [];
         
-        var text_search_all = $('.form-item-full-text-search-all input').val().trim();
+        var text_search_all = $('.form-item-full-text-search-all input').val().replace(/^\s\s*/, '').replace(/\s\s*$/, '');
         if (text_search_all !== '') {
           query.push(text_search_all.replace(/\s+/g, ' AND '));
         }
         
-        var text_search_exact = $('.form-item-full-text-search-exact input').val().trim();
+        var text_search_exact = $('.form-item-full-text-search-exact input').val().replace(/^\s\s*/, '').replace(/\s\s*$/, '');
         if (text_search_exact !== '') {
           query.push('"' + text_search_exact + '"');
         }
         
-        var text_search_any = $('.form-item-full-text-search-any input').val().trim();
+        var text_search_any = $('.form-item-full-text-search-any input').val().replace(/^\s\s*/, '').replace(/\s\s*$/, '');
         if (text_search_any !== '') {
           query.push('(' + text_search_any.replace(/\s+/g, ' OR ') + ')');
         }
         
-        var text_search_exclude = $('.form-item-full-text-search-exclude input').val().trim();
+        var text_search_exclude = $('.form-item-full-text-search-exclude input').val().replace(/^\s\s*/, '').replace(/\s\s*$/, '');
         if (text_search_exclude !== '') {
           query.push('NOT ' + text_search_exclude.replace(/\s+/g, ' AND NOT '));
         }

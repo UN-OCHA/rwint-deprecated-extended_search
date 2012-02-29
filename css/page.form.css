@@ -13,10 +13,10 @@
 }
 
 .extended-search-page-form th.extended-search-filter-operator-header {
-  width: 20%;
+  width: 25%;
 }
 .extended-search-page-form th.extended-search-filter-value-header {
-  width: 65%;
+  width: 60%;
 }
 .extended-search-page-form th.extended-search-filter-weight-header {
   display: none;
@@ -27,10 +27,10 @@
 }
 
 .extended-search-page-form td.extended-search-filter-operator-cell {
-  width: 20%;
+  width: 25%;
 }
 .extended-search-page-form td.extended-search-filter-value-cell {
-  width: 65%;
+  width: 60%;
 }
 .extended-search-page-form td.extended-search-filter-weight-cell {
   display: none;
@@ -69,13 +69,60 @@
   white-space: pre-wrap;
 }
 
-.extended-search-page-form legend{
+.extended-search-page-form legend {
   text-transform: uppercase;
   font-size: 10px;
   color: #999999 !important;
   font-weight: bold;
   
 }
-.extended-search-page-form fieldset{
+.extended-search-page-form > form > div > fieldset {
   margin-bottom: 15px !important;
+}
+
+.extended-search-page-form #edit-filters{
+  width: 49.5%;
+}
+
+.extended-search-page-form #edit-full-text-search {
+  width: 49.5%;
+  float:right;
+}
+
+.extended-search-page-form #edit-filters .fieldset .fieldset-title {
+  font-size: 10px;
+  background-color: #E4E4E4;
+  height: 16px;
+  line-height: 16px;
+}
+
+.extended-search-page-form .form-type-date {
+  width: 40%;
+  float: left;
+  margin-right: 10px;
+}
+
+.extended-search-filter-add-button:after {
+    clear: both;
+    content: ".";
+    display: block;
+    height: 0;
+    visibility: hidden;
+}
+
+.extended-search-page-form #edit-search-query .fieldset-content {
+  position: relitive;
+}
+
+.extended-search-page-form #edit-submit {
+  position: absolute;
+  right: 5px;
+  bottom: 3px;
+  
+  background: url("images/search-bg-btn.png") repeat-x scroll center center transparent !important;
+  border: 1px solid #128BBD;
+  color: #FFFFFF;
+  font-size: 14px;
+  height: 32px;
+  line-height: 28px;
 }
