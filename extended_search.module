@@ -663,23 +663,22 @@ function extended_search_page_view($extended_search, $view_mode = 'full', $langc
     }
     
     // Filters
-    foreach ($parameters['filters'] as $field_name => $groups) {
+    foreach ($parameters['filters'] as $field_name => $filters) {
       if (isset($handlers[$field_name])) {
         $handler = $handlers[$field_name];
         $field_info = $fields[$field_name];      
         
-        foreach ($groups as $group => $filters) {
-          foreach ($filters as $index => $filter) {
-            $value = $handler->getFilterValue($field_name, $field_info, $filter['value']);
+        foreach ($filters as $index => $filter) {
+          $value = $handler->getFilterValue($field_name, $field_info, $filter[1]);
           
-            $form_state['values']['filter_selection'][$field_name][] = array(
-              'operator' => $filter['operator'],
-              'item' => array($field_name => $value),
-            );
-          }
+          $form_state['values']['filters'][$field_name][]['item'] = array(
+            'operator' => $filter[0],
+            'value' => $value,
+          );
         }
       }
     }
+    
   }
   
   $form_id = 'extended_search_page_form';
@@ -694,38 +693,51 @@ function extended_search_page_view($extended_search, $view_mode = 'full', $langc
 function extended_search_full_text_search_form($form, &$form_state, $extended_search) {
   $form['full_text_search'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Full text search'),
+    '#title' => t('Full text search <em>(click to expand)</em>'),
     '#tree' => TRUE,
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
   );
   
-  $form['full_text_search']['explanation'] = array(
+  /*$form['full_text_search']['explanation'] = array(
     '#markup' => '<div class="extended-search-explanation">* ' . t('Type the keywords or phrase you want to search for in the text.') . '</div>',
     '#weight' => -100,
-  );
+  );*/
   
   $form['full_text_search']['all'] = array(
     '#type' => 'textfield',
-    '#title' => t('With all the words'),
+    '#title' => t('With all the words (AND)'),
+    '#description' => t('Example: "gender health coordination" finds only content with all the terms {gender AND health AND coordination}.'),
     '#default_value' => $form_state['values']['full_text_search']['all'],
   );
-  
+
+  $form['full_text_search']['any'] = array(
+    '#type' => 'textfield',
+    '#title' => t('With at least one of the words (OR)'),
+    '#description' => t('Example: "mines cluster" finds any content with either of the terms {mines OR cluster}.'),
+    '#default_value' => $form_state['values']['full_text_search']['any'],
+  );  
+ 
   $form['full_text_search']['exact'] = array(
     '#type' => 'textfield',
     '#title' => t('With the exact phrase'),
+    '#description' => t('Example: "Office for the Coordination" finds any content with this exact phrase.'),
     '#default_value' => $form_state['values']['full_text_search']['exact'],
-  );
-  
-  $form['full_text_search']['any'] = array(
-    '#type' => 'textfield',
-    '#title' => t('With at least one of the words'),
-    '#default_value' => $form_state['values']['full_text_search']['any'],
   );
   
   $form['full_text_search']['exclude'] = array(
     '#type' => 'textfield',
-    '#title' => t('Without the words'),
+    '#title' => t('Excluding the words'), //t('Without the words'),
+    '#description' => t('Example: "conflict" excludes any content with this term.'),
     '#default_value' => $form_state['values']['full_text_search']['exclude'],
   );
+  
+  foreach ($form_state['values']['full_text_search'] as $item) {
+    if (!empty($item)) {
+      $form['full_text_search']['#collapsed'] = FALSE;
+      break;
+    }
+  }
   
   return $form;
 }
@@ -736,144 +748,169 @@ function extended_search_full_text_search_form($form, &$form_state, $extended_se
 function extended_search_filters_form($form, &$form_state, $extended_search) {
   $form['filters'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Filter using ReliefWeb categories'),
-    '#tree' => FALSE,
+    '#title' => t('Filter using ReliefWeb categories <em>(click to expand)</em>'),
+    '#tree' => TRUE,
+    '#prefix' => '<div id="extended-search-page-filters-wrapper">',
+    '#suffix' => '</div>',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
   );  
   
   /*$form['filters']['explanation'] = array(
     '#markup' => '<div class="extended-search-explanation">* ' . t('Filter using ReliefWeb categories.') . '</div>',
     '#weight' => -100,
   );*/
-  
-  $form['filters']['filter_addition'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('>> Add a filter'),
-    '#tree' => TRUE,
-  );
-  
-  $form['filters']['filter_addition']['explanation'] = array(
-    '#markup' => '<div class="extended-search-explanation">* ' . t('Select a category and enter a term or date to narrow down your search.') . '</div>',
-    '#weight' => -100,
-  );
-  
-  $form['filters']['filter_addition']['category'] = array(
-    '#type' => 'select',
-    '#options' => array(),
-    '#attributes' => array('class' => array('extended-search-filter-category-select')),
-    '#tree' => TRUE,
-  );
-  
-  $form['filters']['filter_addition']['input'] = array(
-    '#type' => 'container',
-    '#attributes' => array('class' => array('extended-search-filter-input-container')),
-    '#tree' => TRUE,
-  );
-  
-  $form['filters']['filter_addition']['add'] = array(
-    '#type' => 'button',
-    '#default_value' => t('Add to the selection'),
-    '#attributes' => array('class' => array('extended-search-filter-add-button')),
-    '#ajax' => array(
-      'callback' => 'extended_search_page_form_add_filter_ajax_callback',
-      'event' => 'click',
-    ),
-  );
-  
+  if (isset($form_state['triggering_element']['#array_parents'])) {
+    $triggering_element = $form_state['triggering_element']['#array_parents'];
+  }
+  else {
+    $triggering_element = array();
+  }
+
   $fields = $extended_search->getFields();
   $handlers = $extended_search->getFieldHandlers();
   uasort($fields, 'drupal_sort_weight');
   
-  if (isset($form_state['values']['filter_addition']['category'])) {
-    $category = $form_state['values']['filter_addition']['category'];
-  }
-  else {
-    $category = key($fields);
-  }
+  debug($form_state['values']);
   
-  // Field handlers
   foreach ($fields as $field_name => $field_info) {
-    if (!isset($handlers[$field_name]) || !method_exists($handlers[$field_name], 'buildInput')) {
-      unset($fields[$field_name]);
+    if (!isset($handlers[$field_name])) {
+      continue;
     }
-    else {
-      $class = 'extended-search-filter-input-' . extended_search_format_field_name($field_name);
-      
-      $form['filters']['filter_addition']['input'][$field_name] = $handlers[$field_name]->buildInput($field_name);
-      $form['filters']['filter_addition']['input'][$field_name]['#prefix'] = '<div class="' . $class . '">';
-      $form['filters']['filter_addition']['input'][$field_name]['#suffix'] = '</div>';
-      $form['filters']['filter_addition']['input'][$field_name]['#attributes'] = array(
-        'class' => array('extended-search-filter-input'),
-      );
-      
-      if ($category !== $field_name) {
-        $form['filters']['filter_addition']['input'][$field_name]['#attributes']['class'][] = 'extended-search-filter-input-hidden';
-      }
-      
-      $form['filters']['filter_addition']['category']['#options'][$field_name] = $field_info['label'];
-    }
-  }
     
-  // Filter selection
-  $form['filters']['filter_selection'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('>> Manage selection'),
-    '#tree' => TRUE,
-    '#prefix' => '<div id="extended-search-filter-selection">',
-    '#suffix' => '</div>',
-  );
-  
-  $form['filters']['filter_selection']['explanation'] = array(
-    '#markup' => '<div class="extended-search-explanation">* ' . t('Change how filters are linked together (drag to re-order).') . '</div>',
-    '#weight' => -100,
-  );
-  
-  // Triggering element.
-  $triggering_element = isset($form_state['triggering_element']) ? $form_state['triggering_element'] : NULL;
-  
-  if (isset($form_state['values']['filter_selection'])) {
-    foreach ($form_state['values']['filter_selection'] as $field_name => $filters) {
-      foreach ($filters as $index => $filter) {
-        // Do not add if the triggering element is the associated remove button.
-        if (!isset($triggering_element) || $triggering_element['#array_parents'] != array('filters', 'filter_selection', $field_name, $index, 'remove')) {
-          if (isset($handlers[$field_name])) {
-            $field_value = $filter['item'][$field_name];
-            $field_info = $fields[$field_name];
-            $handler = $handlers[$field_name];
-            
-            $weight = isset($filter['weight']) ? $filter['weight'] : NULL;
-            $operator = isset($filter['operator']) ? $filter['operator'] : NULL;
-            
-            // Add filter
-            extended_search_page_form_add_selected_filter($form['filters']['filter_selection'], $field_name, $field_value, $field_info, $handler, $operator, $weight);
-          }
+    $formatted_field_name = extended_search_format_field_name($field_name);
+    
+    $handler = $handlers[$field_name];
+    
+    $filter = array(
+      '#type' => 'item',
+      '#title' => t($field_info['label']),
+      '#tree' => TRUE,
+      '#prefix' => '<div id="filter-' . $formatted_field_name . '" class="extended-search-filter">',
+      '#suffix' => '</div>',
+      '#theme' => 'extended_search_page_form_filters',
+    );
+    
+    $index_new = 0;
+    
+    unset($form_state['values']['filters'][$field_name]['add']);
+    
+    if (isset($form_state['values']['filters'][$field_name])) {
+      $index_new = count($form_state['values']['filters'][$field_name]);
+      
+      foreach ($form_state['values']['filters'][$field_name] as $index => $item) {
+        if ($triggering_element != array('filters', $field_name, $index, 'item', 'remove')) {
+          $filter[$index] = extended_search_page_add_filter($handler, $field_name, $field_info, $index, $item['item']['operator'], $item['item']['value']);
         }
       }
-    }
-  }
-
-  // Filter addition
-  if ($triggering_element['#array_parents'] == array('filters', 'filter_addition', 'add')) {
-    $field_name = $form_state['values']['filter_addition']['category'];
-  
-    // Current filter.
-    if (!empty($form_state['values']['filter_addition']['input'][$field_name])) {
-      $field_info = $fields[$field_name];
-      $field_value = $form_state['values']['filter_addition']['input'][$field_name];      
-      $handler = $handlers[$field_name];
       
-      // Add filter
-      extended_search_page_form_add_selected_filter($form['filters']['filter_selection'], $field_name, $field_value, $field_info, $handler);
-      
-      // Reset to default value.
-      unset($form_state['input']['filter_addition']['input'][$field_name]);
+      $form['filters']['#collapsed'] = FALSE;
     }
+    
+    if ($triggering_element == array('filters', $field_name, 'add')) {
+      $filter[$index_new] = extended_search_page_add_filter($handler, $field_name, $field_info, $index_new);
+    }
+    
+    $action = 'add';
+    $filter[$action] = array(
+      '#type' => 'button',
+      '#default_value' => t($action),
+      '#name' => $field_name . '_' . $action,
+      '#attributes' => array('class' => array('extended-search-filter-' . $action)),
+      '#ajax' => array(
+        'callback' => 'extended_search_page_form_' . $action . '_filter_ajax_callback',
+        'event' => 'click',
+        'wrapper' => 'filter-' . $formatted_field_name,
+      ),
+    );
+    
+    $form['filters'][$field_name] = $filter;
   }
-  
-  ksort($form['filters']['filter_selection']);
   
   return $form;
 }
 
+function extended_search_page_add_filter($handler, $field_name, $field_info, $index, $operator = NULL, $value = NULL) {
+  $form = array();
+  
+  $form['item'] = array(
+    '#type' => 'container',
+    '#tree' => TRUE,
+    '#attributes' => array(
+      'class' => array('extended-search-filter-item'),
+    ),
+  );
+
+  $action = 'remove';
+  
+  $form['item'] += $handler->buildInput($field_name, $index === 0, $operator, $value);
+  
+  $formatted_field_name = extended_search_format_field_name($field_name);
+  
+  $form['item'][$action] = array(
+    '#type' => 'button',
+    '#default_value' => t($action),
+    '#name' => $field_name . '_' . $action,
+    '#attributes' => array('class' => array('extended-search-filter-' . $action)),
+    '#ajax' => array(
+      'callback' => 'extended_search_page_form_' . $action . '_filter_ajax_callback',
+      'event' => 'click',
+      'wrapper' => 'filter-' . $formatted_field_name,
+    ),
+  );
+  
+  return $form;
+}
+
+/**
+ * Theme function. Display selected filters as table.
+ */
+function theme_extended_search_page_form_filters($variables) {
+  $element = $variables['element'];
+  
+  $rows = array();
+  $header = array(); 
+    
+  $add = drupal_render($element['add']);
+  unset($element['add']);
+  
+  $children = element_children($element);
+  $last = end($children);
+  reset($children);
+  
+  foreach ($children as $key) {
+    $row = array();
+    $row[] = array(
+      'data' => drupal_render($element[$key]['item']['operator']), 
+      'class' => array('extended-search-filter-operator-cell'),
+    );
+    $row[] = array(
+      'data' => drupal_render($element[$key]['item']['value']), 
+      'class' => array('extended-search-filter-value-cell'),
+    );
+    $action = isset($element[$key]['item']['remove']) ? 'remove' : 'add';
+    $row[] = array(
+      'data' => drupal_render($element[$key]['item']['remove']) . ($key === $last ? $add : ''), 
+      'class' => array('extended-search-filter-action-cell'),
+    );
+    $rows[] = array(
+      'data' => $row,
+    );
+  }
+  
+  $output .= theme('table', array(
+    'header' => $header,
+    'rows' => $rows,
+    'sticky' => FALSE,
+    'empty' => t('<em>Click to add</em>') . $add,
+  ));
+
+  return $output;
+}
+
+/**
+ * "Your search query" block on top of the form.
+ */
 function extended_search_search_query_form($form, &$form_state, $extended_search) {
   $form['search_query'] = array(
     '#type' => 'fieldset',
@@ -904,15 +941,26 @@ function extended_search_page_form($form, &$form_state, $extended_search) {
   $form += extended_search_filters_form($form, $form_state, $extended_search);
   
   // Add the user query at the beginning.
-  $form += extended_search_search_query_form($form, $form_state, $extended_search);
+  //$form += extended_search_search_query_form($form, $form_state, $extended_search);
+  /*$form['#attached']['js'] = array(
+    'misc/tabledrag.js',
+    'misc/tableheader.js',
+    drupal_get_path('module', 'extended_search') . '/js/page.form.js',
+  );*/
   
   // Submit
   $submit = array();
   if (!empty($form['#submit'])) {
     $submit += $form['#submit'];
   }
-
-  $form['search_query']['submit'] = array(
+  
+  $form['reset'] = array(
+    '#type' => 'submit',
+    '#value' => t('Reset'),
+    '#submit' => $submit + array('extended_search_page_form_submit'),
+  );
+  
+  $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Search'),
     '#submit' => $submit + array('extended_search_page_form_submit'),
@@ -921,103 +969,13 @@ function extended_search_page_form($form, &$form_state, $extended_search) {
   $form['#attached']['css'] = array(
     drupal_get_path('module', 'extended_search') . '/css/page.form.css',
   );
-  
-  $form['#attached']['js'] = array(
-    'misc/tabledrag.js',
-    'misc/tableheader.js',
-    drupal_get_path('module', 'extended_search') . '/js/page.form.js',
-  );
-  
+
   $form['#prefix'] = '<div class="extended-search-page-form">';
   $form['#suffix'] = '</div>';
-  
   
   $form_state['extended_search'] = $extended_search;
   
   return $form;
-}
-
-/**
- * Add a filter.
- */
-function extended_search_page_form_add_selected_filter(&$selection, $field_name, $field_value, $field_info, $handler, $operator = 'or', $weight = NULL) {
-  $label = $field_info['label'];
-  $value = $handler->getFilter($field_name, $field_info, $field_value);
-  
-  if (!isset($selection[$field_name])) {
-    $selection[$field_name] = array(
-      '#type' => 'item',
-      '#title' => $field_info['label'],
-      '#tree' => TRUE,
-      '#fieldname' => extended_search_format_field_name($field_name),
-      '#theme' => 'extended_search_page_form_filters',
-    );
-  }
-  
-  $index = count(element_children($selection[$field_name]));
-  
-  $weight_delta = $index;
-  if (!isset($weight)) {
-    $weight = $weight_delta;
-  }
-  
-  $element = array(
-    '#type' => 'container',
-    '#tree' => TRUE,
-    '#attributes' => array(
-      'class' => array('extended-search-filter'),
-    ),
-    '#weight' => $weight,
-  );
-  
-  $element['operator'] = array(
-    '#type' => 'select',
-    '#options' => array(
-      'and' => t('AND'),
-      'or' => t('OR'),
-      'not' => t('NOT'),
-    ),
-    '#default_value' => $operator,
-    '#attributes' => array('class' => array('extended-search-filter-operator')),
-  );
-    
-  $element['value'] = array(
-    '#type' => 'markup',
-    '#markup' => '<div class="extended-search-filter-value">' . $value['display'] . '</div>',
-  );
-  
-  $element['weight'] = array(
-    '#type' => 'weight',
-    '#delta' => $weight_delta,
-    '#default_value' => $weight,
-    '#attributes' => array('class' => array('extended-search-filter-weight')),
-  );
-  
-  $element['remove'] = array(
-    '#type' => 'button',
-    '#default_value' => t('remove'),
-    '#name' => $field_name . '_remove_' . $index,
-    '#attributes' => array('class' => array('extended-search-filter-remove')),
-    '#ajax' => array(
-      'callback' => 'extended_search_page_form_remove_filter_ajax_callback',
-      'event' => 'click',
-    ),
-  );
-  
-  $element['item'] = array(
-    '#type' => 'container',
-    '#tree' => TRUE,
-    '#attributes' => array(
-      'class' => array('extended-search-filter-item'),
-    ),
-  );
-  
-  $element['item'][$field_name] = array(
-    '#type' => 'hidden',
-    '#value' => $value['value'],
-  );
-  
-  $selection[$field_name][] = $element;
 }
 
 function theme_extended_search_page_filter($variables) {
@@ -1025,118 +983,66 @@ function theme_extended_search_page_filter($variables) {
 }
 
 /**
- * Theme function. Display selected filters as table.
- */
-function theme_extended_search_page_form_filters($variables) {
-  $element = $variables['element'];
-  $id = 'extended-search-fitler-table-' . $element['#fieldname'];
-  
-  $rows = array();
-  $header = array(
-    array('data' => t('Operator'), 'class' => array('extended-search-filter-operator-header')),
-    array('data' => t('Value'), 'class' => array('extended-search-filter-value-header')),
-    array('data' => t('Weight'), 'class' => array('extended-search-filter-weight-header')),
-    array('data' => t('Remove'), 'class' => array('extended-search-filter-remove-header')),
-  );
-  foreach (element_children($element) as $key) {
-    $row = array();
-    $row[] = array(
-      'data' => drupal_render($element[$key]['operator']), 
-      'class' => array('extended-search-filter-operator-cell'),
-    );
-    $row[] = array(
-      'data' => drupal_render($element[$key]['value']), 
-      'class' => array('extended-search-filter-value-cell'),
-    );
-    $row[] = array(
-      'data' => drupal_render($element[$key]['weight']), 
-      'class' => array('extended-search-filter-weight-cell'),
-    );
-    $row[] = array(
-      'data' => drupal_render($element[$key]['remove']), 
-      'class' => array('extended-search-filter-remove-cell'),
-    );
-    $rows[] = array(
-      'data' => $row,
-      'class' => array('draggable'),
-    );
-  }
-  
-  $output = theme('table', array(
-    'header' => $header,
-    'rows' => $rows,
-    'sticky' => FALSE,
-    'empty' => t('No filter selected.'),
-    'attributes' => array(
-      'id' => $id,
-    ),
-  ));
-  
-  drupal_add_tabledrag($id, 'order', 'sibling', 'extended-search-filter-weight');
-
-  return $output;
-}
-
-/**
  * Page form submit.
  */
 function extended_search_page_form_submit($form, &$form_state) {
-  $extended_search = $form_state['extended_search'];
-  
-  $handlers = $extended_search->getFieldHandlers();
-  
-  $fields = $extended_search->getFields();
-
-  $search = array(
-    'entity_name' => $extended_search->entity_name,
-  );
-  
-  // Full text search
-  foreach (array('all', 'any', 'exclude') as $type) {
-    if (!empty($form_state['values']['full_text_search'][$type])) {
-      $search['text'][$type] = preg_split('/\s+/', $form_state['values']['full_text_search'][$type]);
-    }
-  }
-  if (!empty($form_state['values']['full_text_search']['exact'])) {
-    $search['text']['exact'] = $form_state['values']['full_text_search']['exact'];
-  }
-  
-  // Filters
-  if (isset($form_state['values']['filter_selection'])) {
-    foreach ($form_state['values']['filter_selection'] as $field_name => $filters) {
-      if (isset($handlers[$field_name])) {
-        $field_info = $fields[$field_name];
-        
-        uasort($filters, 'drupal_sort_weight');
-        
-        $group = 0;
-        
-        foreach ($filters as $index => $filter) {
-          $operator = $filter['operator'];
-          $value = $handlers[$field_name]->getValue($field_name, $field_info, $filter['item'][$field_name]);
-          
-          if ($index === 0) {
-            $operator = 'and';
-          }
-          elseif ($operator !== 'or') {
-            $group++;
-          }
-        
-          $search['filters'][$field_name][$group][] = array(
-            'operator' => $operator,
-            'value' => $value,
-          );
-        }
-      }
-    }    
-  }
-  
-  $search_query = drupal_json_encode($search);
+  $reset = isset($form_state['triggering_element']['#array_parents']) && $form_state['triggering_element']['#array_parents'] == array('reset');
   
   $options = array('query' => drupal_get_query_parameters());
-  $options['query']['extended_search'] = $search_query;
+  
+  if (!$reset) {
+    $extended_search = $form_state['extended_search'];
+    
+    $handlers = $extended_search->getFieldHandlers();
+    
+    $fields = $extended_search->getFields();
 
-  if (isset($options['query']['path'])) {
+    $search = array(
+      'entity_name' => $extended_search->entity_name,
+    );
+    
+    // Full text search
+    foreach (array('all', 'any', 'exclude') as $type) {
+      if (!empty($form_state['values']['full_text_search'][$type])) {
+        $search['text'][$type] = preg_split('/\s+/', $form_state['values']['full_text_search'][$type]);
+      }
+    }
+    if (!empty($form_state['values']['full_text_search']['exact'])) {
+      $search['text']['exact'] = $form_state['values']['full_text_search']['exact'];
+    }
+   
+    // Filters 
+    if (isset($form_state['values']['filters'])) {
+      foreach ($form_state['values']['filters'] as $field_name => $filters) {
+        unset($filters['add']);
+        if (isset($handlers[$field_name])) {
+          $handler = $handlers[$field_name];
+          $field_info = $fields[$field_name];
+          
+          foreach ($filters as $index => $filter) {
+            if (!empty($filter['item']['value'])) {
+              $operator = $filter['item']['operator'];
+              $value = $filter['item']['value'];
+              
+              $value = $handler->getValue($field_name, $field_info, $value);
+              
+              if (!empty($value)) {
+                $search['filters'][$field_name][] = array($operator, $value);
+              }
+            }
+          }
+        }
+      }    
+    }
+    
+    $search_query = drupal_json_encode($search);
+    $options['query']['extended_search'] = $search_query;
+  }
+  else {
+    unset($options['query']['extended_search']);
+  }
+
+  if (!$reset && isset($options['query']['path'])) {
     $path = $options['query']['path'];
     unset($options['query']['path']);
   }
@@ -1151,23 +1057,14 @@ function extended_search_page_form_submit($form, &$form_state) {
  * Ajax callback to add a filter.
  */
 function extended_search_page_form_add_filter_ajax_callback($form, $form_state) {
-  $field_name = extended_search_format_field_name($form_state['values']['filter_addition']['category']);
-  
-  $commands = array();
-  $commands[] = ajax_command_invoke("#edit-filter-addition-input-{$field_name}", 'val', array(''));
-  $commands[] = ajax_command_replace('#extended-search-filter-selection', drupal_render($form['filters']['filter_selection']));
-  
-  return array('#type' => 'ajax', '#commands' => $commands);
+  return $form['filters'][$form_state['triggering_element']['#array_parents'][1]];
 }
 
 /**
  * Ajax callback to remove a filter.
  */
 function extended_search_page_form_remove_filter_ajax_callback($form, $form_state) {
-  $commands = array();
-  $commands[] = ajax_command_replace('#extended-search-filter-selection', drupal_render($form['filters']['filter_selection']));
-  
-  return array('#type' => 'ajax', '#commands' => $commands);
+  return $form['filters'][$form_state['triggering_element']['#array_parents'][1]];
 }
 
 /**
@@ -1278,7 +1175,7 @@ function extended_search_block_view($delta = '') {
  */
 function extended_search_build_extended_search_query_block() {
   $block = array();
-
+  
   $parameters = extended_search_unpack_query_parameters(TRUE);
   if (isset($parameters)) {
     $extended_search = $parameters['extended_search'];
@@ -1309,7 +1206,7 @@ function extended_search_build_extended_search_query_block() {
 
       
     // Filters
-    $filters = $parameters['filters'];
+    $param_filters = $parameters['filters'];
     
     $entity_info = entity_get_info($extended_search->target_entity_type);
     $base_table = $entity_info['base table'];
@@ -1319,43 +1216,50 @@ function extended_search_build_extended_search_query_block() {
     $fields = $extended_search->getFields();
     $handlers = $extended_search->getFieldHandlers();
           
-    foreach ($filters as $field_name => $groups) {
+    foreach ($param_filters as $field_name => $filters) {
       if (isset($handlers[$field_name])) {
         $handler = $handlers[$field_name];
         $field_info = $fields_info[$field_name];
         $type = $handler->getType($field_name, $field_info);
         
+        $group_index = 0;
         $sub_query_groups = array();
-        
-        foreach ($groups as $group => $filters) {
-          if (!empty($filters)) {
-            $values = array();
-            $operator = empty($sub_query_groups) ? '' : $filters[0]['operator'];
-            
-            foreach ($filters as $index => $filter) {
-              $filter = $handler->getFilter($field_name, $field_info, $filter['value']);
-              $values[] = $filter['display'];
-            }
-            
-            if (!empty($values)) {
-              $sub_query_groups[] = array(
-                'operator' => $operator,
-                'values' => $values,
-              );
-            }
-          }
-        }
-        
         $sub_query = array();
         
-        foreach ($sub_query_groups as $sub_query_group) {
-          $operator = $sub_query_group['operator'] === 'not' ? 'NOT ' : '';
-          if (count($sub_query_group['values']) > 1) {
-            $sub_query[] = $operator . '(' . implode(' OR ', $sub_query_group['values']) . ')';
+        foreach ($filters as $index => $filter) {
+          list($operator, $conjunction, $negation) = explode('|', $filter[0]);
+          $value = $filter[1];
+          
+          if ($index === 0) {
+            $sub_query_groups[$group_index] = array(
+              'operator' => 'AND',
+              'values' => array(),
+            );
+          }
+          elseif ($conjunction !== 'OR') {
+            $sub_query_groups[++$group_index] = array(
+              'operator' => 'AND',
+              'values' => array(),
+            );
           }
           else {
-            $sub_query[] = $operator . $sub_query_group['values'][0];
-          }          
+            $sub_query_groups[$group_index]['operator'] = 'OR';
+          }
+
+          $filter_value = $handler->getFilter($field_name, $field_info, $value);
+          
+          $sub_query_groups[$group_index]['values'][] = (empty($negation) ? '' : $negation . ' ') . $filter_value['display'];          
+        }
+
+        foreach ($sub_query_groups as $index => $sub_query_group) {
+          $values = $sub_query_group['values'];
+          
+          if (count($values) > 1) {
+            $sub_query[] = '(' . implode(' OR ', $values) . ')';
+          }
+          else {
+            $sub_query[] = $values[0];
+          }
         }
         
         if (!empty($sub_query)) {
@@ -1383,7 +1287,6 @@ function extended_search_build_extended_search_query_block() {
       $options['attributes'] = array('class' => 'extended-search-link');
       $link = l(t('Modify your search'), 'extended_search/' . $extended_search->entity_name, $options);
     
-      // t('Your extended search query')
       $block['subject'] = t('Your advanced search query') . $link;
       $block['content'] = $content;
       
@@ -1413,7 +1316,7 @@ function extended_search_extended_search_allowed_entity_types_alter(&$allowed_en
 function extended_search_extended_search_field_handler_info() {
   $handlers = array();
   
-  $handlers['text'] = array(
+  /*$handlers['text'] = array(
     'label' => t('Text'),
     'description' => t('Text field handler'),
     'class' => 'ExtendedSearchFieldHandlerText',
@@ -1429,9 +1332,9 @@ function extended_search_extended_search_field_handler_info() {
       'text',
       'text_with_summary',
     ),
-  );
+  );*/
   
-  $handlers['numeric'] = array(
+  /*$handlers['numeric'] = array(
     'label' => t('Numeric'),
     'description' => t('Numeric field handler'),
     'class' => 'ExtendedSearchFieldHandlerNumeric',
@@ -1443,7 +1346,7 @@ function extended_search_extended_search_field_handler_info() {
       'float',
       'numeric',
     ),
-  );
+  );*/
   
   $handlers['date'] = array(
     'label' => t('Date'),

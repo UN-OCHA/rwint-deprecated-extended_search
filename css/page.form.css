@@ -1,15 +1,21 @@
+.extended-search-page-form {
+  position: relative;
+}
+
 .extended-search-page-form .tabledrag-toggle-weight-wrapper,
 .extended-search-page-form .extended-search-filter-input-hidden {
   display: none;
 }
-.extended-search-page-form table.tabledrag-processed tbody>:first-child .extended-search-filter-operator  {
+/*.extended-search-page-form table.tabledrag-processed tbody>:first-child .extended-search-filter-operator  {
   visibility: hidden;
-}
+}*/
 .extended-search-page-form table {
   border-collapse:collapse !important;
+  /*width: 95%;*/
 }
 .extended-search-page-form table,th, td {
-  border: 1px solid #DDDDDD !important;
+  /*border: 1px solid #DDDDDD !important;*/
+  border: none !important;
 }
 
 .extended-search-page-form th.extended-search-filter-operator-header {
@@ -18,33 +24,45 @@
 .extended-search-page-form th.extended-search-filter-value-header {
   width: 60%;
 }
-.extended-search-page-form th.extended-search-filter-weight-header {
+/*.extended-search-page-form th.extended-search-filter-weight-header {
   display: none;
   width: 0px;
-}
+}*/
 .extended-search-page-form th.extended-search-filter-remove-header {
-  width: 15%;
+  width: 5%;
 }
 
 .extended-search-page-form td.extended-search-filter-operator-cell {
-  width: 25%;
+  width: 20%;
 }
 .extended-search-page-form td.extended-search-filter-value-cell {
-  width: 60%;
+  width: 70%;
 }
-.extended-search-page-form td.extended-search-filter-weight-cell {
+/*.extended-search-page-form td.extended-search-filter-weight-cell {
   display: none;
   width: 0px;
-}
-.extended-search-page-form td.extended-search-filter-remove-cell {
-  width: 15%;
-  text-align: center;
+}*/
+.extended-search-page-form td.extended-search-filter-action-cell {
+  width: 10%;
 }
 
-.extended-search-page-form .extended-search-filter-input:first-child  .form-type-date {
+.extended-search-page-form td.extended-search-filter-operator-cell .extended-search-filter-operator {
+  width: 100%;
+}
+.extended-search-page-form td.extended-search-filter-value-cell .extended-search-filter-value {
+  width: 100%;
+}
+
+.extended-search-page-form td label,
+.extended-search-page-form td div {
+  display: inline !important;
+}
+
+
+/*.extended-search-page-form .extended-search-filter-input:first-child  .form-type-date {
   border: 1px solid #DDDDDD !important;
   padding: 3px 8px;
-}
+}*/
 
 .extended-search-page-form .extended-search-explanation {
   font-size: 0.8em;
@@ -74,9 +92,14 @@
   font-size: 10px;
   color: #999999 !important;
   font-weight: bold;
-  
 }
-.extended-search-page-form > form > div > fieldset {
+
+.extended-search-page-form  .fieldset .fieldset-title {
+  font-size: 10px;
+  background-color: #E4E4E4;
+}
+
+/*.extended-search-page-form > form > div > fieldset {
   margin-bottom: 15px !important;
 }
 
@@ -108,16 +131,16 @@
     display: block;
     height: 0;
     visibility: hidden;
-}
+}*/
 
 .extended-search-page-form #edit-search-query .fieldset-content {
   position: relitive;
 }
 
 .extended-search-page-form #edit-submit {
-  position: absolute;
+  /*position: absolute;
   right: 5px;
-  bottom: 3px;
+  bottom: 3px;*/
   
   background: url("images/search-bg-btn.png") repeat-x scroll center center transparent !important;
   border: 1px solid #128BBD;
@@ -125,4 +148,81 @@
   font-size: 14px;
   height: 32px;
   line-height: 28px;
+}
+
+.extended-search-page-form .extended-search-filter-remove,
+.extended-search-page-form .extended-search-filter-add {
+  width: 16px;
+  height: 16px;
+  background: url('images/list-remove-4.png') no-repeat scroll 0 100% transparent !important;
+  text-indent: -1000em;
+  padding: 0px !important;
+  border-style: none !important;
+  border-width: 0px !important;
+}
+.extended-search-page-form .extended-search-filter-add {
+  background: url('images/list-add-4.png') no-repeat scroll 0 100% transparent !important;
+  margin-left: 10px;
+}
+.extended-search-page-form .extended-search-filter-remove {
+  margin-right: 10px;
+}
+
+.extended-search-page-form .extended-search-filter {
+  margin-bottom: 15px;
+  background-color: #F4F4F4 !important;
+  width: 100%;
+}
+
+.extended-search-page-form .extended-search-filter table {
+  background-color: #F4F4F4 !important;
+}
+
+.extended-search-page-form .extended-search-filter > div > label {
+  padding-left:5px;
+  color: #666666;
+  font-size: 11px;
+}
+
+.extended-search-page-form .extended-search-filter-item div {
+  display: inline !important;
+}
+
+.extended-search-page-form .extended-search-filter-item label {
+  display: inline !important;
+}
+
+.extended-search-page-form .extended-search-filter-item div {
+  display: inline !important;
+}
+
+.extended-search-page-form .extended-search-filter-value {
+  font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-weight: bold;
+}
+.extended-search-page-form .extended-search-field-date label {
+  margin: 0px 20px;
+}
+
+.extended-search-page-form .collapsible .fieldset-legend span.icon {
+  background-position: -20px -120px !important;
+}
+.extended-search-page-form .collapsed .fieldset-legend span.icon {
+  background-position: 0px -120px !important;
+}
+
+.extended-search-page-form #edit-reset {
+  position: absolute;
+  right: 0px;
+  bottom: 0px;
+}
+
+.extended-search-page-form fieldset legend em {
+  display: none;
+}
+
+.extended-search-page-form fieldset.collapsed legend em {
+  display: inline;
+  font-weight: bold;
+  color: #333333;
 }

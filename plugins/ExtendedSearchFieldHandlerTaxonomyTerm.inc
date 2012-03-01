@@ -1,12 +1,46 @@
 <?php
 
 class ExtendedSearchFieldHandlerTaxonomyTerm extends ExtendedSearchFieldHandlerBase {  
-  public function buildInput($field_name) {    
-    return array(
+  public function buildInput($field_name, $first = TRUE, $default_operator = NULL, $default_value = NULL) {
+    $form = array();
+    
+    if ($first === TRUE) {
+      $options = array(
+        'IN' => t('contains'),
+        'IN||NOT' => t('does NOT contain'),
+      );
+      $default = array('IN');
+    }
+    else {
+      $options = array(
+        'IN|AND|' => t('AND contains'),
+        'IN|AND|NOT' => t('AND does NOT contain'),
+        'IN|OR|' => t('OR contains'),
+        'IN|OR|NOT' => t('OR does NOT contain'),
+      );
+      $default = array('IN|AND|');
+    }
+    
+    $form['operator'] = array(
+      '#type' => 'select',
+      '#options' => $options,
+      '#default_value' => isset($default_operator) ? $default_operator : $default,
+      '#attributes' => array(
+        'class' => array('extended-search-filter-operator'),
+      ),
+    );
+  
+    $form['value'] = array(
       '#type' => 'textfield',
       '#maxlength' => 1024,
+      '#default_value' => isset($default_value) ? $default_value : '',
       '#autocomplete_path' => extended_search_get_autocomplete_path($this->id, $this->entity_type, $this->bundle, $field_name),
+      '#attributes' => array(
+        'class' => array('extended-search-filter-value'),
+      ),
     );
+    
+    return $form;
   }
   
   public function getFilter($field_name, $field_info, $value) {
@@ -24,19 +58,24 @@ class ExtendedSearchFieldHandlerTaxonomyTerm extends ExtendedSearchFieldHandlerB
   }
   
   public function getValue($field_name, $field_info, $value) {
-    $machine_name = $this->getVocabulary($field_name);
+    if (!is_numeric($value)) {
+      $machine_name = $this->getVocabulary($field_name);
 
-    $vocabulary = taxonomy_vocabulary_machine_name_load($machine_name);
-    
-    if (isset($vocabulary->vid)) {
-      $conditions = array(
-        'name' => $value,
-        'vid' => $vocabulary->vid,
-      );
+      $vocabulary = taxonomy_vocabulary_machine_name_load($machine_name);
       
-      $terms = taxonomy_term_load_multiple(FALSE, $conditions);
+      if (isset($vocabulary->vid)) {
+        $conditions = array(
+          'name' => $value,
+          'vid' => $vocabulary->vid,
+        );
+        
+        $terms = taxonomy_term_load_multiple(FALSE, $conditions);
 
-      $term = reset($terms);
+        $term = reset($terms);
+      }
+    }
+    else {
+      $term = taxonomy_term_load($value);
     }
     
     return isset($term->tid) ? $term->tid : NULL;

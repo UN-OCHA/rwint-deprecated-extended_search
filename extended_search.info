@@ -10,3 +10,7 @@ files[] = extended_search.controller.inc
 files[] = extended_search.inc
 files[] = extended_search.install
 files[] = extended_search.module
+files[] = plugins/ExtendedSearchFieldHandlerDate.inc
+files[] = plugins/ExtendedSearchFieldHandlerNumeric.inc
+files[] = plugins/ExtendedSearchFieldHandlerTaxonomyTerm.inc
+files[] = plugins/ExtendedSearchFieldHandlerText.inc
