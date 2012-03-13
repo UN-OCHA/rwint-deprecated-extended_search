@@ -13,9 +13,9 @@ class ExtendedSearchFieldHandlerDate extends ExtendedSearchFieldHandlerBase {
     }
     else {
       $options = array(
-        'BETWEEN|AND|' => t('AND is between'),
-        'BETWEEN|AND|NOT' => t('AND is NOT between'),
         'BETWEEN|OR|' => t('OR is between'),
+        'BETWEEN|AND|NOT' => t('AND is NOT between'),
+        'BETWEEN|AND|' => t('AND is between'),
         'BETWEEN|OR|NOT' => t('OR is NOT between'),
       );
       $default = array('BETWEEN|OR|');

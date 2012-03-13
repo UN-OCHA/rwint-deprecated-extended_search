@@ -13,9 +13,9 @@ class ExtendedSearchFieldHandlerTaxonomyTerm extends ExtendedSearchFieldHandlerB
     }
     else {
       $options = array(
+        'IN|OR|' => t('OR contains'),
         'IN|AND|' => t('AND contains'),
         'IN|AND|NOT' => t('AND does NOT contain'),
-        'IN|OR|' => t('OR contains'),
         'IN|OR|NOT' => t('OR does NOT contain'),
       );
       $default = array('IN|AND|');
