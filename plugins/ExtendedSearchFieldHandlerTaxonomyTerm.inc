@@ -6,10 +6,10 @@ class ExtendedSearchFieldHandlerTaxonomyTerm extends ExtendedSearchFieldHandlerB
     
     if ($first === TRUE) {
       $options = array(
-        'IN' => t('contains'),
+        'IN||' => t('contains'),
         'IN||NOT' => t('does NOT contain'),
       );
-      $default = array('IN');
+      $default = array('IN||');
     }
     else {
       $options = array(
@@ -18,7 +18,7 @@ class ExtendedSearchFieldHandlerTaxonomyTerm extends ExtendedSearchFieldHandlerB
         'IN|AND|NOT' => t('AND does NOT contain'),
         'IN|OR|NOT' => t('OR does NOT contain'),
       );
-      $default = array('IN|AND|');
+      $default = array('IN|OR|');
     }
     
     $form['operator'] = array(

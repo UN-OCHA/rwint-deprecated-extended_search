@@ -9,7 +9,7 @@ class ExtendedSearchFieldHandlerDate extends ExtendedSearchFieldHandlerBase {
         'BETWEEN||' => t('is between'),
         'BETWEEN||NOT' => t('is NOT between'),
       );
-      $default = array('BETWEEN');
+      $default = array('BETWEEN||');
     }
     else {
       $options = array(
