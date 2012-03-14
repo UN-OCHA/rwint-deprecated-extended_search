@@ -771,8 +771,6 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
   $handlers = $extended_search->getFieldHandlers();
   uasort($fields, 'drupal_sort_weight');
   
-  debug($form_state['values']);
-  
   foreach ($fields as $field_name => $field_info) {
     if (!isset($handlers[$field_name])) {
       continue;
@@ -898,7 +896,7 @@ function theme_extended_search_page_form_filters($variables) {
     );
   }
   
-  $output .= theme('table', array(
+  $output = theme('table', array(
     'header' => $header,
     'rows' => $rows,
     'sticky' => FALSE,
