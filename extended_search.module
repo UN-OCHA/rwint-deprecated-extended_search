@@ -651,11 +651,15 @@ function extended_search_page_view($extended_search, $view_mode = 'full', $langc
   if (isset($parameters) && $parameters['entity_name'] === $extended_search->entity_name) {
     $handlers = $extended_search->getFieldHandlers();
     $fields = $extended_search->getFields();
+    
+    $quote = function ($string) {
+      return (strpos($string, ' ') !== FALSE) ? '"' . $string . '"' : $string;
+    };
   
     // Full text search
     foreach (array('all', 'any', 'exclude') as $type) {
       if (!empty($parameters['text'][$type])) {
-        $form_state['values']['full_text_search'][$type] = implode(' ', $parameters['text'][$type]);
+        $form_state['values']['full_text_search'][$type] = implode(' ', array_map($quote, $parameters['text'][$type]));
       }
     }
     if (!empty($parameters['text']['exact'])) { 
@@ -794,11 +798,15 @@ function extended_search_filters_form($form, &$form_state, $extended_search) {
     unset($form_state['values']['filters'][$field_name]['add']);
     
     if (isset($form_state['values']['filters'][$field_name])) {
-      $index_new = count($form_state['values']['filters'][$field_name]);
+      $filters = $form_state['values']['filters'][$field_name];
+      unset($form_state['values']['filters'][$field_name]);
+      unset($form_state['input']['filters'][$field_name]);
       
-      foreach ($form_state['values']['filters'][$field_name] as $index => $item) {
+      foreach ($filters as $index => $item) {
         if ($triggering_element != array('filters', $field_name, $index, 'item', 'remove')) {
-          $filter[$index] = extended_search_page_add_filter($handler, $field_name, $field_info, $index, $item['item']['operator'], $item['item']['value']);
+          $filter[$index_new] = extended_search_page_add_filter($handler, $field_name, $field_info, $index_new, $item['item']['operator'], $item['item']['value']);
+          $form_state['values']['filters'][$field_name][$index_new] = $item;
+          $index_new++;
         }
       }
       
@@ -848,7 +856,7 @@ function extended_search_page_add_filter($handler, $field_name, $field_info, $in
   $form['item'][$action] = array(
     '#type' => 'button',
     '#default_value' => t($action),
-    '#name' => $field_name . '_' . $action,
+    '#name' => $field_name . '_' . $action . '_' . $index,
     '#attributes' => array('class' => array('extended-search-filter-' . $action)),
     '#ajax' => array(
       'callback' => 'extended_search_page_form_' . $action . '_filter_ajax_callback',
@@ -969,6 +977,10 @@ function extended_search_page_form($form, &$form_state, $extended_search) {
   $form['#attached']['css'] = array(
     drupal_get_path('module', 'extended_search') . '/css/page.form.css',
   );
+  
+  $form['#attached']['js'] = array(
+    drupal_get_path('module', 'extended_search') . '/js/page.form.js',
+  );
 
   $form['#prefix'] = '<div class="extended-search-page-form">';
   $form['#suffix'] = '</div>';
@@ -1004,7 +1016,8 @@ function extended_search_page_form_submit($form, &$form_state) {
     // Full text search
     foreach (array('all', 'any', 'exclude') as $type) {
       if (!empty($form_state['values']['full_text_search'][$type])) {
-        $search['text'][$type] = preg_split('/\s+/', $form_state['values']['full_text_search'][$type]);
+        //$search['text'][$type] = preg_split('/\s+/', $form_state['values']['full_text_search'][$type]);
+        $search['text'][$type] = extended_search_parse_search_string($form_state['values']['full_text_search'][$type]);
       }
     }
     if (!empty($form_state['values']['full_text_search']['exact'])) {
@@ -1043,7 +1056,7 @@ function extended_search_page_form_submit($form, &$form_state) {
   }
 
   if (!$reset && isset($options['query']['path'])) {
-    $path = $options['query']['path'];
+    $path = trim($options['query']['path']);
     unset($options['query']['path']);
   }
   else {
@@ -1051,6 +1064,48 @@ function extended_search_page_form_submit($form, &$form_state) {
   }
   
   $form_state['redirect'] = array($path, $options);
+}
+
+/**
+ * Helper function. Parse search string.
+ * Borrowed from Search API - query.inc > parseKeys().
+ */
+function extended_search_parse_search_string($string) {
+  $ret = explode(' ', $string);
+  $quoted = FALSE;
+  $str = '';
+  foreach ($ret as $k => $v) {
+    if (!$v) {
+      continue;
+    }
+    if ($quoted) {
+      if ($v[drupal_strlen($v)-1] == '"') {
+        $v = substr($v, 0, -1);
+        $str .= ' ' . $v;
+        $ret[$k] = $str;
+        $quoted = FALSE;
+      }
+      else {
+        $str .= ' ' . $v;
+        unset($ret[$k]);
+      }
+    }
+    elseif ($v[0] == '"') {
+      $len = drupal_strlen($v);
+      if ($len > 1 && $v[$len-1] == '"') {
+        $ret[$k] = substr($v, 1, -1);
+      }
+      else {
+        $str = substr($v, 1);
+        $quoted = TRUE;
+        unset($ret[$k]);
+      }
+    }
+  }
+  if ($quoted) {
+    $ret[] = $str;
+  }
+  return array_filter($ret);
 }
 
 /**
@@ -1191,13 +1246,18 @@ function extended_search_build_extended_search_query_block() {
       $text_query[] = implode(' AND ', $parameters['text']['all']);
     }
     if (!empty($parameters['text']['exact'])) {
-      $text_query[] = '"' . $parameters['text']['exact'] . '"';
+      $text_query[] = '"' . str_replace('"', '\"', $parameters['text']['exact']) . '"';
     }
     if (!empty($parameters['text']['any'])) {
-      $text_query[] = '(' . implode(' OR ', $parameters['text']['any']) . ')';
+      if (count($parameters['text']['any']) > 1) {
+        $text_query[] = '(' . implode(' OR ', $parameters['text']['any']) . ')';
+      }
+      else {
+        $text_query[] = $parameters['text']['any'][0];
+      }
     }
     if (!empty($parameters['text']['exclude'])) {
-      $text_query[] = 'NOT (' . implode(' AND ', $parameters['text']['exclude']) . ')';
+      $text_query[] = ' NOT ' . implode(' AND NOT ', $parameters['text']['exclude']);
     }
     
     if (!empty($text_query)) {
@@ -1273,7 +1333,7 @@ function extended_search_build_extended_search_query_block() {
         '#type' => 'markup',
         '#markup' => '<div class="extended-search-query">' . 
                      '<div class="extended-search-query-label">' . $label . '</div>' . 
-                     '<div class="extended-search-query-query"><pre>' . $value . '</pre></div>' . 
+                     '<div class="extended-search-query-query">' . $value . '</div>' . 
                      "</div>\n",
       );
     }

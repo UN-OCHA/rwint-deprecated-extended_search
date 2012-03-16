@@ -20,11 +20,11 @@ class ExtendedSearchFieldHandlerTaxonomyTerm extends ExtendedSearchFieldHandlerB
       );
       $default = array('IN|OR|');
     }
-    
+
     $form['operator'] = array(
       '#type' => 'select',
       '#options' => $options,
-      '#default_value' => isset($default_operator) ? $default_operator : $default,
+      '#default_value' => isset($options[$default_operator]) ? $default_operator : $default,
       '#attributes' => array(
         'class' => array('extended-search-filter-operator'),
       ),

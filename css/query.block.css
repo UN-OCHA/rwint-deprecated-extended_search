@@ -11,7 +11,8 @@
 #block-extended-search-extended-search-query .extended-search-query-query {
   padding: 3px 5px;
   color: #555555;
-  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 1.0em;
 }
 
 #block-extended-search-extended-search-query .extended-search-link {
