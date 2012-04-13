@@ -88,6 +88,9 @@
       fields.bind('hastext', function (event) {
         exclude.fadeIn();
       });
+      if ($(fields[0]).val() !== '' || $(fields[1]).val() !== '' || $(fields[2]).val() !== '') {
+        exclude.fadeIn();
+      }      
     }
   };
 })(jQuery);
