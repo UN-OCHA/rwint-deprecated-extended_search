@@ -1226,7 +1226,7 @@ function extended_search_block_view($delta = '') {
 }
 
 /**
- * Build the extended search queuery block content.
+ * Build the extended search query block content.
  */
 function extended_search_build_extended_search_query_block() {
   $block = array();
@@ -1266,94 +1266,96 @@ function extended_search_build_extended_search_query_block() {
 
 
     // Filters
-    $param_filters = $parameters['filters'];
+    if (!empty($parameters['filters'])) {
+      $param_filters = $parameters['filters'];
 
-    $entity_info = entity_get_info($extended_search->target_entity_type);
-    $base_table = $entity_info['base table'];
+      $entity_info = entity_get_info($extended_search->target_entity_type);
+      $base_table = $entity_info['base table'];
 
-    $fields_info = field_info_fields();
+      $fields_info = field_info_fields();
 
-    $fields = $extended_search->getFields();
-    $handlers = $extended_search->getFieldHandlers();
+      $fields = $extended_search->getFields();
+      $handlers = $extended_search->getFieldHandlers();
 
-    foreach ($param_filters as $field_name => $filters) {
-      if (isset($handlers[$field_name])) {
-        $handler = $handlers[$field_name];
-        $field_info = $fields_info[$field_name];
-        $type = $handler->getType($field_name, $field_info);
+      foreach ($param_filters as $field_name => $filters) {
+        if (isset($handlers[$field_name])) {
+          $handler = $handlers[$field_name];
+          $field_info = $fields_info[$field_name];
+          $type = $handler->getType($field_name, $field_info);
 
-        $group_index = 0;
-        $sub_query_groups = array();
-        $sub_query = array();
+          $group_index = 0;
+          $sub_query_groups = array();
+          $sub_query = array();
 
-        foreach ($filters as $index => $filter) {
-          list($operator, $conjunction, $negation) = explode('|', $filter[0]);
-          $value = $filter[1];
+          foreach ($filters as $index => $filter) {
+            list($operator, $conjunction, $negation) = explode('|', $filter[0]);
+            $value = $filter[1];
 
-          if ($index === 0) {
-            $sub_query_groups[$group_index] = array(
-              'operator' => 'AND',
-              'values' => array(),
-            );
+            if ($index === 0) {
+              $sub_query_groups[$group_index] = array(
+                'operator' => 'AND',
+                'values' => array(),
+              );
+            }
+            elseif ($conjunction !== 'OR') {
+              $sub_query_groups[++$group_index] = array(
+                'operator' => 'AND',
+                'values' => array(),
+              );
+            }
+            else {
+              $sub_query_groups[$group_index]['operator'] = 'OR';
+            }
+
+            $filter_value = $handler->getFilter($field_name, $field_info, $value);
+
+            $sub_query_groups[$group_index]['values'][] = (empty($negation) ? '' : $negation . ' ') . $filter_value['display'];
           }
-          elseif ($conjunction !== 'OR') {
-            $sub_query_groups[++$group_index] = array(
-              'operator' => 'AND',
-              'values' => array(),
-            );
+
+          foreach ($sub_query_groups as $index => $sub_query_group) {
+            $values = $sub_query_group['values'];
+
+            if (count($values) > 1) {
+              $sub_query[] = '(' . implode(' OR ', $values) . ')';
+            }
+            else {
+              $sub_query[] = $values[0];
+            }
           }
-          else {
-            $sub_query_groups[$group_index]['operator'] = 'OR';
+
+          if (!empty($sub_query)) {
+            $query[$fields[$field_name]['label']] = implode(' AND ', $sub_query);
           }
-
-          $filter_value = $handler->getFilter($field_name, $field_info, $value);
-
-          $sub_query_groups[$group_index]['values'][] = (empty($negation) ? '' : $negation . ' ') . $filter_value['display'];
-        }
-
-        foreach ($sub_query_groups as $index => $sub_query_group) {
-          $values = $sub_query_group['values'];
-
-          if (count($values) > 1) {
-            $sub_query[] = '(' . implode(' OR ', $values) . ')';
-          }
-          else {
-            $sub_query[] = $values[0];
-          }
-        }
-
-        if (!empty($sub_query)) {
-          $query[$fields[$field_name]['label']] = implode(' AND ', $sub_query);
         }
       }
-    }
 
-    foreach ($query as $label => $value) {
-      $content[] = array(
-        '#type' => 'markup',
-        '#markup' => '<div class="extended-search-query">' .
-                     '<div class="extended-search-query-label">' . $label . '</div>' .
-                     '<div class="extended-search-query-query">' . $value . '</div>' .
-                     "</div>\n",
-      );
-    }
-
-    if (!empty($content)) {
-      $options = array('query' => drupal_get_query_parameters());
-      if (isset($options['query']['extended_search'])) {
-        $options['query']['extended_search'] = urldecode($options['query']['extended_search']);
+      foreach ($query as $label => $value) {
+        $content[] = array(
+          '#type' => 'markup',
+          '#markup' => '<div class="extended-search-query">' .
+                       '<div class="extended-search-query-label">' . $label . '</div>' .
+                       '<div class="extended-search-query-query">' . $value . '</div>' .
+                       "</div>\n",
+        );
       }
-      $options['query']['path'] = request_path();
-      $options['attributes'] = array('class' => 'extended-search-link');
-      $link = l(t('Modify your search'), 'extended_search/' . $extended_search->entity_name, $options);
 
-      $block['subject'] = t('Your advanced search query') . $link;
-      $block['content'] = $content;
+      if (!empty($content)) {
+        $options = array('query' => drupal_get_query_parameters());
+        if (isset($options['query']['extended_search'])) {
+          $options['query']['extended_search'] = urldecode($options['query']['extended_search']);
+        }
+        $options['query']['path'] = request_path();
+        $options['attributes'] = array('class' => 'extended-search-link');
+        $link = l(t('Modify your search'), 'extended_search/' . $extended_search->entity_name, $options);
 
-			drupal_add_css(
-				drupal_get_path('module', 'extended_search') . '/css/query.block.css',
-				array('group' => CSS_THEME, 'every_page' => FALSE, 'weight' => 999)
-			);
+        $block['subject'] = t('Your advanced search query') . $link;
+        $block['content'] = $content;
+
+        drupal_add_css(
+          drupal_get_path('module', 'extended_search') . '/css/query.block.css',
+          array('group' => CSS_THEME, 'every_page' => FALSE, 'weight' => 999)
+        );
+      }
     }
   }
 
